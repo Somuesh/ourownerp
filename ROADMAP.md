@@ -4,6 +4,7 @@ Goal: bring this system's functionality up to (and eventually past) Odoo's
 core modules for our use case, plus voice-driven data entry — built in
 phases, each one a working, testable state rather than one giant rewrite.
 
+
 Priority order (as decided): Sales → Purchasing → Inventory/Warehouse →
 HR/Employees → Point of Sale → Projects/Tasks → Accounting (GL) →
 Manufacturing. Voice assistant lands after Sales + Purchasing exist.
