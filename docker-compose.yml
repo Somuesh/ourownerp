@@ -1,0 +1,23 @@
+# Local Postgres for development. Not required in production if you're
+# pointing DATABASE_URL at a managed database (RDS, Neon, Supabase, etc.) —
+# this is purely a convenience for `pnpm dev`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ourerp
+      POSTGRES_PASSWORD: ourerp
+      POSTGRES_DB: ourerp
+    ports:
+      - "5432:5432"
+    volumes:
+      - ourerp-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ourerp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ourerp-postgres-data:
