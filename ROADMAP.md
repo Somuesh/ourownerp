@@ -4,7 +4,6 @@ Goal: bring this system's functionality up to (and eventually past) Odoo's
 core modules for our use case, plus voice-driven data entry — built in
 phases, each one a working, testable state rather than one giant rewrite.
 
-
 Priority order (as decided): Sales → Purchasing → Inventory/Warehouse →
 HR/Employees → Point of Sale → Projects/Tasks → Accounting (GL) →
 Manufacturing. Voice assistant lands after Sales + Purchasing exist.
@@ -12,7 +11,7 @@ Manufacturing. Voice assistant lands after Sales + Purchasing exist.
 - [x] **Phase 0 — Foundation**: Postgres + Drizzle ORM, migrations tooling,
       audit log, generalized document-numbering sequences, capability-based
       permissions framework (additive — existing role checks untouched).
-- [ ] **Phase 1 — Sales**: Quotation → Sales Order → Delivery → Invoice →
+- [x] **Phase 1 — Sales**: Quotation → Sales Order → Delivery → Invoice →
       Payment, replacing today's flat invoice-only flow. Line items carry
       state (quoted/confirmed/delivered/invoiced).
 - [ ] **Phase 2 — Purchasing**: Vendors, Purchase Orders, Vendor Bills,

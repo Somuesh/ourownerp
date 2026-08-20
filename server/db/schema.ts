@@ -31,6 +31,13 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "paid",
   "overdue",
 ]);
+export const salesOrderStatusEnum = pgEnum("sales_order_status", [
+  "draft", // quotation — freely editable
+  "confirmed", // sales order — locked, awaiting fulfillment
+  "delivered", // stock has been shipped out
+  "invoiced", // an invoice has been generated from this order
+  "cancelled",
+]);
 
 // ---------------------------------------------------------------------------
 // Core / identity
@@ -164,103 +171,118 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
 });
 
 // ---------------------------------------------------------------------------
-// Platform: sequences
+// Sales — Phase 1. Quotation (draft) -> Sales Order (confirmed) -> Delivery
+// -> Invoice. Deliberately reuses the existing flat `products.stockQuantity`
+// counter (via stock_adjustments) rather than a proper warehouse/stock-move
+// model, since multi-location inventory is Phase 4 — this will get upgraded
+// then rather than built twice.
+// ---------------------------------------------------------------------------
+
+export const salesOrders = pgTable("sales_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderNumber: text("order_number").notNull().unique(),
+  status: salesOrderStatusEnum("status").notNull().default("draft"),
+  contactId: uuid("contact_id").references(() => contacts.id),
+  companyId: uuid("company_id").references(() => companies.id),
+  orderDate: timestamp("order_date", { withTimezone: true }).notNull(),
+  expectedDeliveryDate: timestamp("expected_delivery_date", { withTimezone: true }),
+  notes: text("notes"),
+  taxRate: numeric("tax_rate", { precision: 6, scale: 3 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  taxAmount: numeric("tax_amount", { precision: 14, scale: 2 }).notNull(),
+  total: numeric("total", { precision: 14, scale: 2 }).notNull(),
+  // Set once each lifecycle step happens; null until then. Lets the UI
+  // show a simple timeline without a separate history table.
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  // Set once /invoice is called — the SO's own invoice. One-to-one for v1;
+  // partial/multiple invoicing per order is a reasonable later extension.
+  invoiceId: uuid("invoice_id").references(() => invoices.id),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const salesOrderLineItems = pgTable("sales_order_line_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  salesOrderId: uuid("sales_order_id")
+    .notNull()
+    .references(() => salesOrders.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").references(() => products.id),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+});
+
+// ---------------------------------------------------------------------------
+// Platform: sequences (generalizes the old one-off "invoice number counter"
+// so Sales Orders, Purchase Orders, etc. in later phases can reuse it)
 // ---------------------------------------------------------------------------
 
 export const sequences = pgTable("sequences", {
-  key: text("key").primaryKey(),
+  key: text("key").primaryKey(), // e.g. "invoice", "sales_order", "purchase_order"
   value: bigint("value", { mode: "number" }).notNull().default(0),
 });
 
 // ---------------------------------------------------------------------------
-// Platform: audit log
+// Platform: audit log — append-only record of who changed what and when.
+// Every mutating route call writes one row here (see server/audit.ts).
 // ---------------------------------------------------------------------------
 
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   actorId: uuid("actor_id").references(() => users.id),
-  action: text("action").notNull(),
-  entityType: text("entity_type").notNull(),
+  action: text("action").notNull(), // "create" | "update" | "delete" | domain-specific e.g. "status_change"
+  entityType: text("entity_type").notNull(), // "invoice", "deal", "product", ...
   entityId: text("entity_id").notNull(),
+  // Best-effort diff/snapshot; deliberately loose-typed since every entity
+  // shape differs and this is a debugging/compliance trail, not a source
+  // of truth for application logic.
   changes: jsonb("changes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------
-// Platform: permissions
+// Platform: permissions — per-role capability grants, seeded with defaults
+// but editable at runtime (Settings > Roles, future phase) rather than
+// hardcoded in route files. See server/permissions.ts for how routes use it.
 // ---------------------------------------------------------------------------
 
 export const rolePermissions = pgTable(
   "role_permissions",
   {
     role: roleEnum("role").notNull(),
-    capability: text("capability").notNull(),
+    capability: text("capability").notNull(), // e.g. "sales:create", "inventory:adjust"
     granted: boolean("granted").notNull().default(true),
   },
   (table) => [primaryKey({ columns: [table.role, table.capability] })],
 );
 
 // ---------------------------------------------------------------------------
-// Relations
+// Relations (used by Drizzle's relational query API where convenient)
 // ---------------------------------------------------------------------------
-
-export const usersRelations = relations(users, ({ many }) => ({
-  createdCompanies: many(companies),
-  createdContacts: many(contacts),
-  createdDeals: many(deals),
-  activities: many(activities),
-  createdProducts: many(products),
-  createdInvoices: many(invoices),
-  auditLogs: many(auditLog),
-}));
-
-export const companiesRelations = relations(companies, ({ one, many }) => ({
-  creator: one(users, { fields: [companies.createdBy], references: [users.id] }),
-  contacts: many(contacts),
-  deals: many(deals),
-  invoices: many(invoices),
-}));
 
 export const contactsRelations = relations(contacts, ({ one, many }) => ({
   company: one(companies, { fields: [contacts.companyId], references: [companies.id] }),
-  creator: one(users, { fields: [contacts.createdBy], references: [users.id] }),
   activities: many(activities),
-  deals: many(deals),
-  invoices: many(invoices),
+}));
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  contact: one(contacts, { fields: [activities.contactId], references: [contacts.id] }),
+  author: one(users, { fields: [activities.authorId], references: [users.id] }),
 }));
 
 export const dealsRelations = relations(deals, ({ one }) => ({
   contact: one(contacts, { fields: [deals.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [deals.companyId], references: [companies.id] }),
-  creator: one(users, { fields: [deals.createdBy], references: [users.id] }),
-}));
-
-export const activitiesRelations = relations(activities, ({ one }) => ({
-  contact: one(contacts, {
-    fields: [activities.contactId],
-    references: [contacts.id],
-  }),
-  author: one(users, {
-    fields: [activities.authorId],
-    references: [users.id],
-  }),
-}));
-
-export const productsRelations = relations(products, ({ one, many }) => ({
-  creator: one(users, { fields: [products.createdBy], references: [users.id] }),
-  stockAdjustments: many(stockAdjustments),
-  invoiceLineItems: many(invoiceLineItems),
-}));
-
-export const stockAdjustmentsRelations = relations(stockAdjustments, ({ one }) => ({
-  product: one(products, { fields: [stockAdjustments.productId], references: [products.id] }),
-  creator: one(users, { fields: [stockAdjustments.createdBy], references: [users.id] }),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   contact: one(contacts, { fields: [invoices.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [invoices.companyId], references: [companies.id] }),
-  creator: one(users, { fields: [invoices.createdBy], references: [users.id] }),
   lineItems: many(invoiceLineItems),
 }));
 
@@ -269,6 +291,17 @@ export const invoiceLineItemsRelations = relations(invoiceLineItems, ({ one }) =
   product: one(products, { fields: [invoiceLineItems.productId], references: [products.id] }),
 }));
 
-export const auditLogRelations = relations(auditLog, ({ one }) => ({
-  actor: one(users, { fields: [auditLog.actorId], references: [users.id] }),
+export const salesOrdersRelations = relations(salesOrders, ({ one, many }) => ({
+  contact: one(contacts, { fields: [salesOrders.contactId], references: [contacts.id] }),
+  company: one(companies, { fields: [salesOrders.companyId], references: [companies.id] }),
+  invoice: one(invoices, { fields: [salesOrders.invoiceId], references: [invoices.id] }),
+  lineItems: many(salesOrderLineItems),
+}));
+
+export const salesOrderLineItemsRelations = relations(salesOrderLineItems, ({ one }) => ({
+  salesOrder: one(salesOrders, {
+    fields: [salesOrderLineItems.salesOrderId],
+    references: [salesOrders.id],
+  }),
+  product: one(products, { fields: [salesOrderLineItems.productId], references: [products.id] }),
 }));

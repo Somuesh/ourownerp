@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { eq } from "drizzle-orm";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 import { db } from "./db/client.ts";
 import { users } from "./db/schema.ts";
 
@@ -52,10 +52,27 @@ async function verifyToken(req: Request): Promise<Identity> {
     throw new AppError(401, "User not logged in");
   }
 
-  // DEV_AUTH_BYPASS=true lets you develop against this API without a real
-  // OIDC token: send `Authorization: Bearer <any-stable-string>` and it's
-  // treated as that user's identity. Never enable in production.
+  // DEV_AUTH_BYPASS=true skips *signature* verification, but still treats
+  // a real JWT (e.g. a real Google/Auth0/Okta ID token, if you've already
+  // configured VITE_OIDC_* on the frontend) as that provider's stable
+  // identity by reading its `sub` claim — not the raw token string, which
+  // changes every login and would otherwise create a new user each time.
+  // Only a genuinely non-JWT string (e.g. `Bearer test-user-1` from curl)
+  // falls back to using the literal string as the identity. Never enable
+  // DEV_AUTH_BYPASS in production either way — it skips signature checks.
   if (devBypass) {
+    if (token.split(".").length === 3) {
+      try {
+        const payload = decodeJwt(token);
+        return {
+          sub: payload.sub!,
+          name: typeof payload.name === "string" ? payload.name : undefined,
+          email: typeof payload.email === "string" ? payload.email : undefined,
+        };
+      } catch {
+        // Fall through to raw-string identity below.
+      }
+    }
     return { sub: token };
   }
 

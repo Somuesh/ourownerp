@@ -141,3 +141,40 @@ export interface DashboardOverview {
     partyName: string | null;
   }>;
 }
+
+export type SalesOrderStatus = "draft" | "confirmed" | "delivered" | "invoiced" | "cancelled";
+
+export interface SalesOrder {
+  _id: string;
+  orderNumber: string;
+  status: SalesOrderStatus;
+  contactId?: string | null;
+  companyId?: string | null;
+  orderDateIso: string;
+  expectedDeliveryDateIso?: string | null;
+  notes?: string | null;
+  taxRate: number;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  confirmedAtIso?: string | null;
+  deliveredAtIso?: string | null;
+  invoicedAtIso?: string | null;
+  cancelledAtIso?: string | null;
+  invoiceId?: string | null;
+  createdBy: string;
+}
+
+export interface SalesOrderWithParty extends SalesOrder {
+  contactName: string | null;
+  companyName: string | null;
+}
+
+export interface SalesOrderLineItem {
+  _id: string;
+  salesOrderId: string;
+  productId?: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}

@@ -10,6 +10,7 @@ import dealsRouter from "./routes/deals.ts";
 import invoicesRouter from "./routes/invoices.ts";
 import portalRouter from "./routes/portal.ts";
 import productsRouter from "./routes/products.ts";
+import salesOrdersRouter from "./routes/salesOrders.ts";
 import stockAdjustmentsRouter from "./routes/stockAdjustments.ts";
 import usersRouter from "./routes/users.ts";
 
@@ -31,6 +32,7 @@ app.use(activitiesRouter);
 app.use(productsRouter);
 app.use(stockAdjustmentsRouter);
 app.use(invoicesRouter);
+app.use(salesOrdersRouter);
 app.use(portalRouter);
 app.use(dashboardRouter);
 

@@ -1,6 +1,7 @@
 CREATE TYPE "public"."deal_stage" AS ENUM('new', 'qualified', 'proposal', 'won', 'lost');--> statement-breakpoint
 CREATE TYPE "public"."invoice_status" AS ENUM('draft', 'sent', 'paid', 'overdue');--> statement-breakpoint
 CREATE TYPE "public"."role" AS ENUM('admin', 'staff', 'client');--> statement-breakpoint
+CREATE TYPE "public"."sales_order_status" AS ENUM('draft', 'confirmed', 'delivered', 'invoiced', 'cancelled');--> statement-breakpoint
 CREATE TABLE "activities" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"contact_id" uuid NOT NULL,
@@ -96,6 +97,38 @@ CREATE TABLE "role_permissions" (
 	CONSTRAINT "role_permissions_role_capability_pk" PRIMARY KEY("role","capability")
 );
 --> statement-breakpoint
+CREATE TABLE "sales_order_line_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"sales_order_id" uuid NOT NULL,
+	"product_id" uuid,
+	"description" text NOT NULL,
+	"quantity" numeric(14, 3) NOT NULL,
+	"unit_price" numeric(14, 2) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "sales_orders" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"order_number" text NOT NULL,
+	"status" "sales_order_status" DEFAULT 'draft' NOT NULL,
+	"contact_id" uuid,
+	"company_id" uuid,
+	"order_date" timestamp with time zone NOT NULL,
+	"expected_delivery_date" timestamp with time zone,
+	"notes" text,
+	"tax_rate" numeric(6, 3) NOT NULL,
+	"subtotal" numeric(14, 2) NOT NULL,
+	"tax_amount" numeric(14, 2) NOT NULL,
+	"total" numeric(14, 2) NOT NULL,
+	"confirmed_at" timestamp with time zone,
+	"delivered_at" timestamp with time zone,
+	"invoiced_at" timestamp with time zone,
+	"cancelled_at" timestamp with time zone,
+	"invoice_id" uuid,
+	"created_by" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "sales_orders_order_number_unique" UNIQUE("order_number")
+);
+--> statement-breakpoint
 CREATE TABLE "sequences" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" bigint DEFAULT 0 NOT NULL
@@ -136,5 +169,11 @@ ALTER TABLE "invoices" ADD CONSTRAINT "invoices_contact_id_contacts_id_fk" FOREI
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "products" ADD CONSTRAINT "products_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_order_line_items" ADD CONSTRAINT "sales_order_line_items_sales_order_id_sales_orders_id_fk" FOREIGN KEY ("sales_order_id") REFERENCES "public"."sales_orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_order_line_items" ADD CONSTRAINT "sales_order_line_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stock_adjustments" ADD CONSTRAINT "stock_adjustments_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stock_adjustments" ADD CONSTRAINT "stock_adjustments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
