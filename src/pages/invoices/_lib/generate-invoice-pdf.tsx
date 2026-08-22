@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { InvoiceLineItem, InvoiceWithParty } from "@/lib/types.ts";
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
 export function downloadInvoicePdf(
   invoice: InvoiceWithParty,

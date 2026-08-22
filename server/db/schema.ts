@@ -18,13 +18,6 @@ import {
 // ---------------------------------------------------------------------------
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "client"]);
-export const dealStageEnum = pgEnum("deal_stage", [
-  "new",
-  "qualified",
-  "proposal",
-  "won",
-  "lost",
-]);
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "draft",
   "sent",
@@ -80,11 +73,27 @@ export const contacts = pgTable("contacts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// User-customizable CRM pipeline stages (unlike Sales Order / Invoice
+// statuses, these have no automation tied to them — safe to let users add,
+// rename, and reorder freely). `isWon`/`isLost` mark the (at most one each,
+// enforced in server/routes/dealStages.ts) stages that close a deal, so the
+// dashboard's "open deals" calculation doesn't need to hardcode stage names.
+export const dealStages = pgTable("deal_stages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isWon: boolean("is_won").notNull().default(false),
+  isLost: boolean("is_lost").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const deals = pgTable("deals", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   value: numeric("value", { precision: 14, scale: 2 }).notNull(),
-  stage: dealStageEnum("stage").notNull(),
+  stageId: uuid("stage_id")
+    .notNull()
+    .references(() => dealStages.id),
   contactId: uuid("contact_id").references(() => contacts.id),
   companyId: uuid("company_id").references(() => companies.id),
   createdBy: uuid("created_by")
@@ -278,6 +287,11 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
 export const dealsRelations = relations(deals, ({ one }) => ({
   contact: one(contacts, { fields: [deals.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [deals.companyId], references: [companies.id] }),
+  stage: one(dealStages, { fields: [deals.stageId], references: [dealStages.id] }),
+}));
+
+export const dealStagesRelations = relations(dealStages, ({ many }) => ({
+  deals: many(deals),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({

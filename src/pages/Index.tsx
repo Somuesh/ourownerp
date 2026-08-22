@@ -34,26 +34,20 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
-const STAGE_LABELS: Record<string, string> = {
-  new: "New",
-  qualified: "Qualified",
-  proposal: "Proposal",
-  won: "Won",
-  lost: "Lost",
-};
-
-const STAGE_COLORS: Record<string, string> = {
-  new: "var(--chart-1)",
-  qualified: "var(--chart-2)",
-  proposal: "var(--chart-3)",
-  won: "var(--chart-4)",
-  lost: "var(--chart-5)",
-};
+// Cycles through the theme's chart color variables regardless of how many
+// stages exist — stage names/colors are no longer fixed now that Deals
+// stages are user-defined (see server/routes/dealStages.ts).
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 
 type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
-type DealStage = "new" | "qualified" | "proposal" | "won" | "lost";
 
 const statusVariant: Record<InvoiceStatus, "secondary" | "default" | "destructive"> = {
   draft: "secondary",
@@ -93,10 +87,10 @@ export default function Dashboard() {
     );
   }
 
-  const stageData = (Object.keys(STAGE_LABELS) as Array<DealStage>).map((stage) => ({
-    stage,
-    label: STAGE_LABELS[stage],
-    count: overview.dealsByStage[stage],
+  const stageData = overview.dealsByStage.map((stage) => ({
+    stage: stage.stageId,
+    label: stage.stageName,
+    count: stage.count,
   }));
 
   const invoiceStatusData = (Object.keys(overview.invoicesByStatus) as Array<InvoiceStatus>)
@@ -210,8 +204,8 @@ export default function Dashboard() {
                     }}
                   />
                   <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {stageData.map((entry) => (
-                      <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage]} />
+                    {stageData.map((entry, index) => (
+                      <Cell key={entry.stage} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -338,7 +332,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{currency.format(deal.value)}</span>
-                    <Badge variant="secondary">{STAGE_LABELS[deal.stage]}</Badge>
+                    <Badge variant="secondary">{deal.stageName}</Badge>
                   </div>
                 </div>
               ))

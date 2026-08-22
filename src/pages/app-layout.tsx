@@ -50,7 +50,7 @@ export default function AppLayout() {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
           <span className="text-sm font-medium text-muted-foreground">
-            Our ERP Business Suite
+            Our ERP
           </span>
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-6">

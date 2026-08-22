@@ -4,7 +4,6 @@ import { db } from "../db/client.ts";
 
 const router = Router();
 
-type StageCounts = Record<"new" | "qualified" | "proposal" | "won" | "lost", number>;
 type InvoiceStatusCounts = Record<"draft" | "sent" | "paid" | "overdue", number>;
 
 router.get(
@@ -12,22 +11,41 @@ router.get(
   asyncHandler(async (req, res) => {
     await requireStaffOrAdmin(req);
 
-    const [allDeals, allProducts, allInvoices, allContacts, allCompanies] = await Promise.all([
-      db.query.deals.findMany(),
-      db.query.products.findMany(),
-      db.query.invoices.findMany({ orderBy: (i, { desc }) => desc(i.createdAt) }),
-      db.query.contacts.findMany(),
-      db.query.companies.findMany(),
-    ]);
+    const [allDeals, allDealStages, allProducts, allInvoices, allContacts, allCompanies] =
+      await Promise.all([
+        db.query.deals.findMany(),
+        db.query.dealStages.findMany({ orderBy: (s, { asc }) => asc(s.sortOrder) }),
+        db.query.products.findMany(),
+        db.query.invoices.findMany({ orderBy: (i, { desc }) => desc(i.createdAt) }),
+        db.query.contacts.findMany(),
+        db.query.companies.findMany(),
+      ]);
     const contactNameById = new Map(allContacts.map((c) => [c.id, c.name]));
     const companyNameById = new Map(allCompanies.map((c) => [c.id, c.name]));
+    const stageById = new Map(allDealStages.map((s) => [s.id, s]));
 
-    const dealsByStage: StageCounts = { new: 0, qualified: 0, proposal: 0, won: 0, lost: 0 };
+    // Dynamic per-stage counts, in the user's own stage order — no more
+    // hardcoded stage names now that stages are user-defined (see
+    // server/routes/dealStages.ts). "Open" means neither the Won nor the
+    // Lost stage (whichever those currently are), so this keeps working no
+    // matter what the stages are named or how many there are.
+    const dealsByStage = allDealStages.map((stage) => {
+      const dealsInStage = allDeals.filter((d) => d.stageId === stage.id);
+      return {
+        stageId: stage.id,
+        stageName: stage.name,
+        isWon: stage.isWon,
+        isLost: stage.isLost,
+        count: dealsInStage.length,
+        value: dealsInStage.reduce((sum, d) => sum + Number(d.value), 0),
+      };
+    });
+
     let openDealsCount = 0;
     let openDealsValue = 0;
     for (const deal of allDeals) {
-      dealsByStage[deal.stage] += 1;
-      if (deal.stage !== "won" && deal.stage !== "lost") {
+      const stage = stageById.get(deal.stageId);
+      if (stage && !stage.isWon && !stage.isLost) {
         openDealsCount += 1;
         openDealsValue += Number(deal.value);
       }
@@ -77,7 +95,7 @@ router.get(
         _id: deal.id,
         title: deal.title,
         value: Number(deal.value),
-        stage: deal.stage,
+        stageName: stageById.get(deal.stageId)?.name ?? "—",
         partyName: partyName(deal.contactId, deal.companyId),
       }));
 

@@ -36,10 +36,15 @@ export default function CompanyDialog({
   open,
   onOpenChange,
   company,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   company?: Company;
+  /** Called with the new company's id right after a successful create
+   * (not on edit) — lets a calling form (e.g. the Invoice or Sales Order
+   * dialog) auto-select the company it just created inline. */
+  onCreated?: (id: string) => void;
 }) {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -82,12 +87,13 @@ export default function CompanyDialog({
         });
         toast.success("Company updated");
       } else {
-        await createCompany.mutateAsync({
+        const created = await createCompany.mutateAsync({
           name: values.name,
           website: values.website || undefined,
           industry: values.industry || undefined,
         });
         toast.success("Company created");
+        onCreated?.(created._id);
       }
       onOpenChange(false);
     } catch (error) {

@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, PlusCircle, Trash2 } from "lucide-react";
 import { useApiClient, ApiError } from "@/lib/api-client.ts";
 import type { Company, Contact, Invoice, InvoiceLineItem, Product } from "@/lib/types.ts";
 import {
@@ -29,9 +29,17 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import CompanyDialog from "@/pages/crm/_components/company-dialog.tsx";
+import ContactDialog from "@/pages/crm/_components/contact-dialog.tsx";
+
+// Sentinel Select values that trigger the inline "create new" dialogs below
+// instead of being treated as a real selection.
+const CREATE_COMPANY = "__create_company__";
+const CREATE_CONTACT = "__create_contact__";
 
 const lineItemSchema = z.object({
   productId: z.string().optional(),
@@ -97,6 +105,9 @@ export default function InvoiceDialog({
     onSuccess: invalidate,
   });
 
+  const [newCompanyDialogOpen, setNewCompanyDialogOpen] = useState(false);
+  const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -147,7 +158,7 @@ export default function InvoiceDialog({
   const taxAmount = subtotal * ((Number(watchedTaxRate) || 0) / 100);
   const total = subtotal + taxAmount;
 
-  const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
   const handleProductSelect = (index: number, productId: string) => {
     form.setValue(`lineItems.${index}.productId`, productId);
@@ -214,7 +225,14 @@ export default function InvoiceDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Company</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) =>
+                        value === CREATE_COMPANY
+                          ? setNewCompanyDialogOpen(true)
+                          : field.onChange(value)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="No company" />
@@ -227,6 +245,11 @@ export default function InvoiceDialog({
                             {company.name}
                           </SelectItem>
                         ))}
+                        <SelectSeparator />
+                        <SelectItem value={CREATE_COMPANY}>
+                          <PlusCircle className="size-3.5" />
+                          Create new company
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -239,7 +262,14 @@ export default function InvoiceDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) =>
+                        value === CREATE_CONTACT
+                          ? setNewContactDialogOpen(true)
+                          : field.onChange(value)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="No contact" />
@@ -252,6 +282,11 @@ export default function InvoiceDialog({
                             {contact.name}
                           </SelectItem>
                         ))}
+                        <SelectSeparator />
+                        <SelectItem value={CREATE_CONTACT}>
+                          <PlusCircle className="size-3.5" />
+                          Create new contact
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -436,6 +471,23 @@ export default function InvoiceDialog({
           </form>
         </Form>
       </DialogContent>
+
+      <CompanyDialog
+        open={newCompanyDialogOpen}
+        onOpenChange={setNewCompanyDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["companies"] });
+          form.setValue("companyId", id);
+        }}
+      />
+      <ContactDialog
+        open={newContactDialogOpen}
+        onOpenChange={setNewContactDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["contacts"] });
+          form.setValue("contactId", id);
+        }}
+      />
     </Dialog>
   );
 }

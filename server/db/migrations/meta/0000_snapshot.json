@@ -1,5 +1,5 @@
 {
-  "id": "13dc0c62-ed79-406f-a438-25d230c48488",
+  "id": "db80aa60-d759-493d-a4d6-48b091475ef2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -296,6 +296,60 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.deal_stages": {
+      "name": "deal_stages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "is_won": {
+          "name": "is_won",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_lost": {
+          "name": "is_lost",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.deals": {
       "name": "deals",
       "schema": "",
@@ -319,10 +373,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "stage": {
-          "name": "stage",
-          "type": "deal_stage",
-          "typeSchema": "public",
+        "stage_id": {
+          "name": "stage_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -354,6 +407,19 @@
       },
       "indexes": {},
       "foreignKeys": {
+        "deals_stage_id_deal_stages_id_fk": {
+          "name": "deals_stage_id_deal_stages_id_fk",
+          "tableFrom": "deals",
+          "tableTo": "deal_stages",
+          "columnsFrom": [
+            "stage_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "deals_contact_id_contacts_id_fk": {
           "name": "deals_contact_id_contacts_id_fk",
           "tableFrom": "deals",
@@ -1198,17 +1264,6 @@
     }
   },
   "enums": {
-    "public.deal_stage": {
-      "name": "deal_stage",
-      "schema": "public",
-      "values": [
-        "new",
-        "qualified",
-        "proposal",
-        "won",
-        "lost"
-      ]
-    },
     "public.invoice_status": {
       "name": "invoice_status",
       "schema": "public",

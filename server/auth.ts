@@ -4,9 +4,6 @@ import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 import { db } from "./db/client.ts";
 import { users } from "./db/schema.ts";
 
-import dotenv from "dotenv";
-dotenv.config();
-
 /** Thrown anywhere in a route handler; the error middleware in index.ts turns
  * this into a JSON response with the right status code. */
 export class AppError extends Error {

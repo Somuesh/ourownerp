@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { PlusCircle } from "lucide-react";
 import { useApiClient, ApiError } from "@/lib/api-client.ts";
-import type { Company, Contact, Deal } from "@/lib/types.ts";
+import type { Company, Contact, Deal, DealStage } from "@/lib/types.ts";
 import {
   Dialog,
   DialogContent,
@@ -27,9 +28,15 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import CompanyDialog from "./company-dialog.tsx";
+import ContactDialog from "./contact-dialog.tsx";
+
+const CREATE_COMPANY = "__create_company__";
+const CREATE_CONTACT = "__create_contact__";
 
 const dealSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -62,13 +69,17 @@ export default function DealDialog({
     queryKey: ["companies"],
     queryFn: () => api.get("/companies"),
   });
+  const { data: stages } = useQuery<DealStage[]>({
+    queryKey: ["deal-stages"],
+    queryFn: () => api.get("/deal-stages"),
+  });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["deals"] });
 
   const createDeal = useMutation({
     mutationFn: (values: {
       title: string;
       value: number;
-      stage: string;
+      stageId: string;
       contactId?: string;
       companyId?: string;
     }) => api.post("/deals", values),
@@ -84,6 +95,9 @@ export default function DealDialog({
     }) => api.patch(`/deals/${values.dealId}`, values),
     onSuccess: invalidate,
   });
+
+  const [newCompanyDialogOpen, setNewCompanyDialogOpen] = useState(false);
+  const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
 
   const form = useForm<DealFormValues>({
     resolver: zodResolver(dealSchema),
@@ -119,10 +133,17 @@ export default function DealDialog({
         });
         toast.success("Deal updated");
       } else {
+        // New deals start in whichever stage sorts first — usually "New" —
+        // rather than asking the user to pick one on every creation.
+        const firstStage = [...(stages ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+        if (!firstStage) {
+          toast.error("No deal stages exist yet — add one from the Deals kanban first");
+          return;
+        }
         await createDeal.mutateAsync({
           title: values.title,
           value,
-          stage: "new",
+          stageId: firstStage._id,
           contactId,
           companyId,
         });
@@ -178,7 +199,14 @@ export default function DealDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Company</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) =>
+                      value === CREATE_COMPANY
+                        ? setNewCompanyDialogOpen(true)
+                        : field.onChange(value)
+                    }
+                  >
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="No company" />
@@ -191,6 +219,11 @@ export default function DealDialog({
                           {company.name}
                         </SelectItem>
                       ))}
+                      <SelectSeparator />
+                      <SelectItem value={CREATE_COMPANY}>
+                        <PlusCircle className="size-3.5" />
+                        Create new company
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -203,7 +236,14 @@ export default function DealDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contact</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) =>
+                      value === CREATE_CONTACT
+                        ? setNewContactDialogOpen(true)
+                        : field.onChange(value)
+                    }
+                  >
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="No contact" />
@@ -216,6 +256,11 @@ export default function DealDialog({
                           {contact.name}
                         </SelectItem>
                       ))}
+                      <SelectSeparator />
+                      <SelectItem value={CREATE_CONTACT}>
+                        <PlusCircle className="size-3.5" />
+                        Create new contact
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -230,6 +275,23 @@ export default function DealDialog({
           </form>
         </Form>
       </DialogContent>
+
+      <CompanyDialog
+        open={newCompanyDialogOpen}
+        onOpenChange={setNewCompanyDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["companies"] });
+          form.setValue("companyId", id);
+        }}
+      />
+      <ContactDialog
+        open={newContactDialogOpen}
+        onOpenChange={setNewContactDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["contacts"] });
+          form.setValue("contactId", id);
+        }}
+      />
     </Dialog>
   );
 }

@@ -3,7 +3,7 @@ import { Router } from "express";
 import { recordAudit } from "../audit.ts";
 import { AppError, asyncHandler, requireStaffOrAdmin } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { companies, contacts, deals } from "../db/schema.ts";
+import { companies, contacts, deals, dealStages } from "../db/schema.ts";
 
 const router = Router();
 
@@ -12,7 +12,7 @@ function rowToDeal(row: typeof deals.$inferSelect) {
     _id: row.id,
     title: row.title,
     value: Number(row.value),
-    stage: row.stage,
+    stageId: row.stageId,
     contactId: row.contactId,
     companyId: row.companyId,
     createdBy: row.createdBy,
@@ -24,16 +24,23 @@ router.get(
   asyncHandler(async (req, res) => {
     await requireStaffOrAdmin(req);
     const rows = await db
-      .select({ deal: deals, contactName: contacts.name, companyName: companies.name })
+      .select({
+        deal: deals,
+        contactName: contacts.name,
+        companyName: companies.name,
+        stageName: dealStages.name,
+      })
       .from(deals)
       .leftJoin(contacts, eq(contacts.id, deals.contactId))
       .leftJoin(companies, eq(companies.id, deals.companyId))
+      .leftJoin(dealStages, eq(dealStages.id, deals.stageId))
       .orderBy(desc(deals.createdAt));
     res.json(
       rows.map((r) => ({
         ...rowToDeal(r.deal),
         contactName: r.contactName,
         companyName: r.companyName,
+        stageName: r.stageName,
       })),
     );
   }),
@@ -43,19 +50,21 @@ router.post(
   "/deals",
   asyncHandler(async (req, res) => {
     const user = await requireStaffOrAdmin(req);
-    const { title, value, stage, contactId, companyId } = req.body as {
+    const { title, value, stageId, contactId, companyId } = req.body as {
       title: string;
       value: number;
-      stage: "new" | "qualified" | "proposal" | "won" | "lost";
+      stageId: string;
       contactId?: string;
       companyId?: string;
     };
+    if (!stageId) throw new AppError(400, "A stage is required");
+
     const [created] = await db
       .insert(deals)
       .values({
         title,
         value: String(value),
-        stage,
+        stageId,
         contactId: contactId ?? null,
         companyId: companyId ?? null,
         createdBy: user._id,
@@ -67,7 +76,7 @@ router.post(
       action: "create",
       entityType: "deal",
       entityId: created.id,
-      changes: { title, value, stage, contactId, companyId },
+      changes: { title, value, stageId, contactId, companyId },
     });
 
     res.json({ _id: created.id });
@@ -112,10 +121,15 @@ router.patch(
   "/deals/:id/stage",
   asyncHandler(async (req, res) => {
     const user = await requireStaffOrAdmin(req);
-    const { stage } = req.body as { stage: string };
+    const { stageId } = req.body as { stageId: string };
+    if (!stageId) throw new AppError(400, "A stage is required");
+
+    const stage = await db.query.dealStages.findFirst({ where: eq(dealStages.id, stageId) });
+    if (!stage) throw new AppError(404, "Stage not found");
+
     const [updated] = await db
       .update(deals)
-      .set({ stage: stage as "new" | "qualified" | "proposal" | "won" | "lost" })
+      .set({ stageId })
       .where(eq(deals.id, req.params.id))
       .returning({ id: deals.id });
     if (!updated) throw new AppError(404, "Deal not found");
@@ -125,7 +139,7 @@ router.patch(
       action: "status_change",
       entityType: "deal",
       entityId: req.params.id,
-      changes: { stage },
+      changes: { stageId, stageName: stage.name },
     });
 
     res.json(null);

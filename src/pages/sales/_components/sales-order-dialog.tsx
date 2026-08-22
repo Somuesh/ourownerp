@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, PlusCircle, Trash2 } from "lucide-react";
 import { useApiClient, ApiError } from "@/lib/api-client.ts";
 import type {
   Company,
@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog.tsx";
 import {
   Form,
@@ -31,13 +32,28 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import CompanyDialog from "@/pages/crm/_components/company-dialog.tsx";
+import ContactDialog from "@/pages/crm/_components/contact-dialog.tsx";
+
+const CREATE_COMPANY = "__create_company__";
+const CREATE_CONTACT = "__create_contact__";
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Quotation",
+  confirmed: "Confirmed",
+  delivered: "Delivered",
+  invoiced: "Invoiced",
+  cancelled: "Cancelled",
+};
 
 const lineItemSchema = z.object({
   productId: z.string().optional(),
@@ -79,6 +95,12 @@ export default function SalesOrderDialog({
 }) {
   const api = useApiClient();
   const queryClient = useQueryClient();
+  // Anything past "draft" is locked server-side too (see server/routes/salesOrders.ts
+  // PATCH /sales-orders/:id) — the dialog opens read-only for those so you can still
+  // see full details, just can't edit them. Only a brand-new quotation (no `order`
+  // yet) or one still in "draft" is editable.
+  const readOnly = !!order && order.status !== "draft";
+
   const { data: contacts } = useQuery<Contact[]>({
     queryKey: ["contacts"],
     queryFn: () => api.get("/contacts"),
@@ -102,6 +124,9 @@ export default function SalesOrderDialog({
       api.patch(`/sales-orders/${orderId}`, payload),
     onSuccess: invalidate,
   });
+
+  const [newCompanyDialogOpen, setNewCompanyDialogOpen] = useState(false);
+  const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
@@ -149,7 +174,7 @@ export default function SalesOrderDialog({
   }, 0);
   const taxAmount = subtotal * ((Number(watchedTaxRate) || 0) / 100);
   const total = subtotal + taxAmount;
-  const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
   const handleProductSelect = (index: number, productId: string) => {
     form.setValue(`lineItems.${index}.productId`, productId);
@@ -201,7 +226,18 @@ export default function SalesOrderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{order ? "Edit quotation" : "New quotation"}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>
+              {readOnly ? order!.orderNumber : order ? "Edit quotation" : "New quotation"}
+            </DialogTitle>
+            {order && <Badge variant="secondary">{STATUS_LABEL[order.status]}</Badge>}
+          </div>
+          {readOnly && (
+            <DialogDescription>
+              This order is past the quotation stage and is locked. Use the ⋯ menu on the
+              list to move it forward, or read details below.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -212,7 +248,15 @@ export default function SalesOrderDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Company</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      disabled={readOnly}
+                      onValueChange={(value) =>
+                        value === CREATE_COMPANY
+                          ? setNewCompanyDialogOpen(true)
+                          : field.onChange(value)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="No company" />
@@ -225,6 +269,11 @@ export default function SalesOrderDialog({
                             {company.name}
                           </SelectItem>
                         ))}
+                        <SelectSeparator />
+                        <SelectItem value={CREATE_COMPANY}>
+                          <PlusCircle className="size-3.5" />
+                          Create new company
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -237,7 +286,15 @@ export default function SalesOrderDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      disabled={readOnly}
+                      onValueChange={(value) =>
+                        value === CREATE_CONTACT
+                          ? setNewContactDialogOpen(true)
+                          : field.onChange(value)
+                      }
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="No contact" />
@@ -250,6 +307,11 @@ export default function SalesOrderDialog({
                             {contact.name}
                           </SelectItem>
                         ))}
+                        <SelectSeparator />
+                        <SelectItem value={CREATE_CONTACT}>
+                          <PlusCircle className="size-3.5" />
+                          Create new contact
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -266,7 +328,7 @@ export default function SalesOrderDialog({
                   <FormItem>
                     <FormLabel>Order date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" disabled={readOnly} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -279,7 +341,7 @@ export default function SalesOrderDialog({
                   <FormItem>
                     <FormLabel>Expected delivery</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" disabled={readOnly} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -292,7 +354,7 @@ export default function SalesOrderDialog({
                   <FormItem>
                     <FormLabel>Tax rate (%)</FormLabel>
                     <FormControl>
-                      <Input type="number" min={0} step="0.1" {...field} />
+                      <Input type="number" min={0} step="0.1" disabled={readOnly} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -303,17 +365,19 @@ export default function SalesOrderDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <FormLabel>Line items</FormLabel>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    append({ productId: "none", description: "", quantity: "1", unitPrice: "0" })
-                  }
-                >
-                  <Plus className="size-3.5" />
-                  Add item
-                </Button>
+                {!readOnly && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      append({ productId: "none", description: "", quantity: "1", unitPrice: "0" })
+                    }
+                  >
+                    <Plus className="size-3.5" />
+                    Add item
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -324,6 +388,7 @@ export default function SalesOrderDialog({
                   >
                     <Select
                       value={form.watch(`lineItems.${index}.productId`)}
+                      disabled={readOnly}
                       onValueChange={(value) => handleProductSelect(index, value)}
                     >
                       <SelectTrigger className="w-full">
@@ -344,7 +409,7 @@ export default function SalesOrderDialog({
                       render={({ field: descField }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Description" {...descField} />
+                            <Input placeholder="Description" disabled={readOnly} {...descField} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -355,7 +420,14 @@ export default function SalesOrderDialog({
                       render={({ field: qtyField }) => (
                         <FormItem>
                           <FormControl>
-                            <Input type="number" min={0} step="1" placeholder="Qty" {...qtyField} />
+                            <Input
+                              type="number"
+                              min={0}
+                              step="1"
+                              placeholder="Qty"
+                              disabled={readOnly}
+                              {...qtyField}
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -371,6 +443,7 @@ export default function SalesOrderDialog({
                               min={0}
                               step="0.01"
                               placeholder="Price"
+                              disabled={readOnly}
                               {...priceField}
                             />
                           </FormControl>
@@ -382,7 +455,7 @@ export default function SalesOrderDialog({
                       variant="ghost"
                       size="icon"
                       className="size-8"
-                      disabled={fields.length === 1}
+                      disabled={readOnly || fields.length === 1}
                       onClick={() => remove(index)}
                     >
                       <Trash2 className="size-3.5" />
@@ -404,7 +477,11 @@ export default function SalesOrderDialog({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Delivery instructions, terms, etc." {...field} />
+                    <Textarea
+                      placeholder="Delivery instructions, terms, etc."
+                      disabled={readOnly}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -427,13 +504,36 @@ export default function SalesOrderDialog({
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {order ? "Save changes" : "Create quotation"}
-              </Button>
+              {readOnly ? (
+                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+                  Close
+                </Button>
+              ) : (
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {order ? "Save changes" : "Create quotation"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
+
+      <CompanyDialog
+        open={newCompanyDialogOpen}
+        onOpenChange={setNewCompanyDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["companies"] });
+          form.setValue("companyId", id);
+        }}
+      />
+      <ContactDialog
+        open={newContactDialogOpen}
+        onOpenChange={setNewContactDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["contacts"] });
+          form.setValue("contactId", id);
+        }}
+      />
     </Dialog>
   );
 }

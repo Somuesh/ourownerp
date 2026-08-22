@@ -42,7 +42,7 @@ const statusVariant: Record<InvoiceStatus, "secondary" | "default" | "destructiv
   overdue: "destructive",
 };
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
 export default function Portal() {
   const api = useApiClient();

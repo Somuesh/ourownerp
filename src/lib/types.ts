@@ -2,7 +2,6 @@
 // `Doc<"table">` / `Id<"table">` types). IDs are plain strings (UUIDs).
 
 export type Role = "admin" | "staff" | "client";
-export type DealStage = "new" | "qualified" | "proposal" | "won" | "lost";
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 
 export interface User {
@@ -34,11 +33,22 @@ export interface ContactWithCompany extends Contact {
   companyName: string | null;
 }
 
+/** A user-customizable CRM pipeline stage (add/rename/delete freely — see
+ * server/routes/dealStages.ts). At most one stage has isWon and one has
+ * isLost; those are what the dashboard uses to compute "open" deals. */
+export interface DealStage {
+  _id: string;
+  name: string;
+  sortOrder: number;
+  isWon: boolean;
+  isLost: boolean;
+}
+
 export interface Deal {
   _id: string;
   title: string;
   value: number;
-  stage: DealStage;
+  stageId: string;
   contactId?: string | null;
   companyId?: string | null;
   createdBy: string;
@@ -47,6 +57,7 @@ export interface Deal {
 export interface DealWithParty extends Deal {
   contactName: string | null;
   companyName: string | null;
+  stageName: string | null;
 }
 
 export interface Activity {
@@ -118,7 +129,14 @@ export interface InvoiceLineItem {
 export interface DashboardOverview {
   openDealsCount: number;
   openDealsValue: number;
-  dealsByStage: Record<DealStage, number>;
+  dealsByStage: Array<{
+    stageId: string;
+    stageName: string;
+    isWon: boolean;
+    isLost: boolean;
+    count: number;
+    value: number;
+  }>;
   lowStockCount: number;
   totalProductsCount: number;
   outstandingInvoicesCount: number;
@@ -137,7 +155,7 @@ export interface DashboardOverview {
     _id: string;
     title: string;
     value: number;
-    stage: DealStage;
+    stageName: string;
     partyName: string | null;
   }>;
 }

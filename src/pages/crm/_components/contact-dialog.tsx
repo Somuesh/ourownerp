@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { PlusCircle } from "lucide-react";
 import { useApiClient, ApiError } from "@/lib/api-client.ts";
 import type { Company, Contact } from "@/lib/types.ts";
 import {
@@ -27,9 +28,13 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import CompanyDialog from "./company-dialog.tsx";
+
+const CREATE_COMPANY = "__create_company__";
 
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -44,10 +49,15 @@ export default function ContactDialog({
   open,
   onOpenChange,
   contact,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: Contact;
+  /** Called with the new contact's id right after a successful create
+   * (not on edit) — lets a calling form (e.g. the Invoice or Sales Order
+   * dialog) auto-select the contact it just created inline. */
+  onCreated?: (id: string) => void;
 }) {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -72,6 +82,8 @@ export default function ContactDialog({
     }) => api.patch(`/contacts/${values.contactId}`, values),
     onSuccess: invalidate,
   });
+
+  const [newCompanyDialogOpen, setNewCompanyDialogOpen] = useState(false);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
@@ -104,13 +116,14 @@ export default function ContactDialog({
         });
         toast.success("Contact updated");
       } else {
-        await createContact.mutateAsync({
+        const created = await createContact.mutateAsync({
           name: values.name,
           email: values.email || undefined,
           phone: values.phone || undefined,
           companyId,
         });
         toast.success("Contact created");
+        onCreated?.(created._id);
       }
       onOpenChange(false);
     } catch (error) {
@@ -175,7 +188,14 @@ export default function ContactDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Company</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) =>
+                      value === CREATE_COMPANY
+                        ? setNewCompanyDialogOpen(true)
+                        : field.onChange(value)
+                    }
+                  >
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="No company" />
@@ -188,6 +208,11 @@ export default function ContactDialog({
                           {company.name}
                         </SelectItem>
                       ))}
+                      <SelectSeparator />
+                      <SelectItem value={CREATE_COMPANY}>
+                        <PlusCircle className="size-3.5" />
+                        Create new company
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -202,6 +227,15 @@ export default function ContactDialog({
           </form>
         </Form>
       </DialogContent>
+
+      <CompanyDialog
+        open={newCompanyDialogOpen}
+        onOpenChange={setNewCompanyDialogOpen}
+        onCreated={(id) => {
+          queryClient.invalidateQueries({ queryKey: ["companies"] });
+          form.setValue("companyId", id);
+        }}
+      />
     </Dialog>
   );
 }
