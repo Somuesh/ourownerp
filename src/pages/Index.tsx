@@ -18,6 +18,8 @@ import {
   Boxes,
   FileWarning,
   DollarSign,
+  ShoppingCart,
+  Receipt,
   ArrowRight,
 } from "lucide-react";
 import { useApiClient } from "@/lib/api-client.ts";
@@ -34,7 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 // Cycles through the theme's chart color variables regardless of how many
 // stages exist — stage names/colors are no longer fixed now that Deals
@@ -129,6 +131,18 @@ export default function Dashboard() {
       hint: "From paid invoices",
       icon: DollarSign,
     },
+    {
+      title: "Open purchase orders",
+      value: overview.openPurchaseOrdersCount.toString(),
+      hint: `${currency.format(overview.openPurchaseOrdersValue)} committed to vendors`,
+      icon: ShoppingCart,
+    },
+    {
+      title: "Outstanding vendor bills",
+      value: overview.outstandingBillsCount.toString(),
+      hint: `${currency.format(overview.outstandingBillsValue)} owed to vendors`,
+      icon: Receipt,
+    },
   ];
 
   return (
@@ -147,7 +161,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader>

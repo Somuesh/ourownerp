@@ -11,6 +11,9 @@ import ContactDetail from "./pages/crm/ContactDetails.tsx";
 import Inventory from "./pages/inventory/Inventory.tsx";
 import Invoices from "./pages/invoices/Invoices.tsx";
 import SalesOrders from "./pages/sales/SalesOrders.tsx";
+import PurchasingLayout from "./pages/purchasing/purchasing-layout.tsx";
+import PurchaseOrders from "./pages/purchasing/PurchaseOrders.tsx";
+import VendorBills from "./pages/purchasing/VendorBills.tsx";
 import Portal from "./pages/portal/Portal.tsx";
 import PortalInvoiceDetail from "./pages/portal/PortalInvoiceDetails.tsx";
 import SettingsUsers from "./pages/settings/Users.tsx";
@@ -33,6 +36,10 @@ export default function App() {
             </Route>
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/sales" element={<SalesOrders />} />
+            <Route element={<PurchasingLayout />}>
+              <Route path="/purchasing" element={<PurchaseOrders />} />
+              <Route path="/purchasing/bills" element={<VendorBills />} />
+            </Route>
             <Route path="/invoices" element={<Invoices />} />
             <Route
               path="/portal"

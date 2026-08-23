@@ -31,6 +31,19 @@ export const salesOrderStatusEnum = pgEnum("sales_order_status", [
   "invoiced", // an invoice has been generated from this order
   "cancelled",
 ]);
+export const purchaseOrderStatusEnum = pgEnum("purchase_order_status", [
+  "draft", // RFQ — freely editable
+  "confirmed", // purchase order — locked, awaiting receipt
+  "received", // stock has been received in
+  "billed", // a vendor bill has been generated from this order
+  "cancelled",
+]);
+export const vendorBillStatusEnum = pgEnum("vendor_bill_status", [
+  "draft",
+  "open", // received from vendor, awaiting payment
+  "paid",
+  "overdue",
+]);
 
 // ---------------------------------------------------------------------------
 // Core / identity
@@ -227,6 +240,77 @@ export const salesOrderLineItems = pgTable("sales_order_line_items", {
 });
 
 // ---------------------------------------------------------------------------
+// Purchasing — Phase 2. Mirrors Sales structurally: RFQ (draft) -> Purchase
+// Order (confirmed) -> Receipt -> Vendor Bill. Vendors are just companies/
+// contacts (no separate vendor entity) — see MIGRATION.md for why.
+// ---------------------------------------------------------------------------
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderNumber: text("order_number").notNull().unique(),
+  status: purchaseOrderStatusEnum("status").notNull().default("draft"),
+  vendorContactId: uuid("vendor_contact_id").references(() => contacts.id),
+  vendorCompanyId: uuid("vendor_company_id").references(() => companies.id),
+  orderDate: timestamp("order_date", { withTimezone: true }).notNull(),
+  expectedReceiptDate: timestamp("expected_receipt_date", { withTimezone: true }),
+  notes: text("notes"),
+  taxRate: numeric("tax_rate", { precision: 6, scale: 3 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  taxAmount: numeric("tax_amount", { precision: 14, scale: 2 }).notNull(),
+  total: numeric("total", { precision: 14, scale: 2 }).notNull(),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  receivedAt: timestamp("received_at", { withTimezone: true }),
+  billedAt: timestamp("billed_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  billId: uuid("bill_id"),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const purchaseOrderLineItems = pgTable("purchase_order_line_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  purchaseOrderId: uuid("purchase_order_id")
+    .notNull()
+    .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").references(() => products.id),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+});
+
+export const vendorBills = pgTable("vendor_bills", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  billNumber: text("bill_number").notNull().unique(),
+  status: vendorBillStatusEnum("status").notNull().default("draft"),
+  vendorContactId: uuid("vendor_contact_id").references(() => contacts.id),
+  vendorCompanyId: uuid("vendor_company_id").references(() => companies.id),
+  billDate: timestamp("bill_date", { withTimezone: true }).notNull(),
+  dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
+  notes: text("notes"),
+  taxRate: numeric("tax_rate", { precision: 6, scale: 3 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  taxAmount: numeric("tax_amount", { precision: 14, scale: 2 }).notNull(),
+  total: numeric("total", { precision: 14, scale: 2 }).notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const vendorBillLineItems = pgTable("vendor_bill_line_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vendorBillId: uuid("vendor_bill_id")
+    .notNull()
+    .references(() => vendorBills.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").references(() => products.id),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+});
+
+// ---------------------------------------------------------------------------
 // Platform: sequences (generalizes the old one-off "invoice number counter"
 // so Sales Orders, Purchase Orders, etc. in later phases can reuse it)
 // ---------------------------------------------------------------------------
@@ -318,4 +402,48 @@ export const salesOrderLineItemsRelations = relations(salesOrderLineItems, ({ on
     references: [salesOrders.id],
   }),
   product: one(products, { fields: [salesOrderLineItems.productId], references: [products.id] }),
+}));
+
+export const purchaseOrdersRelations = relations(purchaseOrders, ({ one, many }) => ({
+  vendorContact: one(contacts, {
+    fields: [purchaseOrders.vendorContactId],
+    references: [contacts.id],
+  }),
+  vendorCompany: one(companies, {
+    fields: [purchaseOrders.vendorCompanyId],
+    references: [companies.id],
+  }),
+  bill: one(vendorBills, { fields: [purchaseOrders.billId], references: [vendorBills.id] }),
+  lineItems: many(purchaseOrderLineItems),
+}));
+
+export const purchaseOrderLineItemsRelations = relations(purchaseOrderLineItems, ({ one }) => ({
+  purchaseOrder: one(purchaseOrders, {
+    fields: [purchaseOrderLineItems.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+  product: one(products, {
+    fields: [purchaseOrderLineItems.productId],
+    references: [products.id],
+  }),
+}));
+
+export const vendorBillsRelations = relations(vendorBills, ({ one, many }) => ({
+  vendorContact: one(contacts, {
+    fields: [vendorBills.vendorContactId],
+    references: [contacts.id],
+  }),
+  vendorCompany: one(companies, {
+    fields: [vendorBills.vendorCompanyId],
+    references: [companies.id],
+  }),
+  lineItems: many(vendorBillLineItems),
+}));
+
+export const vendorBillLineItemsRelations = relations(vendorBillLineItems, ({ one }) => ({
+  vendorBill: one(vendorBills, {
+    fields: [vendorBillLineItems.vendorBillId],
+    references: [vendorBills.id],
+  }),
+  product: one(products, { fields: [vendorBillLineItems.productId], references: [products.id] }),
 }));

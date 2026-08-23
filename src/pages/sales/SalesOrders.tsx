@@ -75,7 +75,7 @@ const statusVariant: Record<SalesOrderStatus, "secondary" | "default" | "destruc
   cancelled: "destructive",
 };
 
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const SO_COLUMNS = [
   { id: "customer", label: "Customer" },

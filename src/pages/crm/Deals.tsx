@@ -56,7 +56,11 @@ import { ColumnVisibilityMenu } from "@/components/ui/column-visibility-menu.tsx
 import { useColumnVisibility } from "@/hooks/use-column-visibility.ts";
 import DealDialog from "./_components/deal-dialog.tsx";
 
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0,});
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 
 const DEAL_COLUMNS = [
   { id: "party", label: "Company / Contact" },

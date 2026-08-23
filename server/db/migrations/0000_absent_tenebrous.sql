@@ -1,6 +1,8 @@
 CREATE TYPE "public"."invoice_status" AS ENUM('draft', 'sent', 'paid', 'overdue');--> statement-breakpoint
+CREATE TYPE "public"."purchase_order_status" AS ENUM('draft', 'confirmed', 'received', 'billed', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."role" AS ENUM('admin', 'staff', 'client');--> statement-breakpoint
 CREATE TYPE "public"."sales_order_status" AS ENUM('draft', 'confirmed', 'delivered', 'invoiced', 'cancelled');--> statement-breakpoint
+CREATE TYPE "public"."vendor_bill_status" AS ENUM('draft', 'open', 'paid', 'overdue');--> statement-breakpoint
 CREATE TABLE "activities" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"contact_id" uuid NOT NULL,
@@ -98,6 +100,38 @@ CREATE TABLE "products" (
 	CONSTRAINT "products_sku_unique" UNIQUE("sku")
 );
 --> statement-breakpoint
+CREATE TABLE "purchase_order_line_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"purchase_order_id" uuid NOT NULL,
+	"product_id" uuid,
+	"description" text NOT NULL,
+	"quantity" numeric(14, 3) NOT NULL,
+	"unit_price" numeric(14, 2) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "purchase_orders" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"order_number" text NOT NULL,
+	"status" "purchase_order_status" DEFAULT 'draft' NOT NULL,
+	"vendor_contact_id" uuid,
+	"vendor_company_id" uuid,
+	"order_date" timestamp with time zone NOT NULL,
+	"expected_receipt_date" timestamp with time zone,
+	"notes" text,
+	"tax_rate" numeric(6, 3) NOT NULL,
+	"subtotal" numeric(14, 2) NOT NULL,
+	"tax_amount" numeric(14, 2) NOT NULL,
+	"total" numeric(14, 2) NOT NULL,
+	"confirmed_at" timestamp with time zone,
+	"received_at" timestamp with time zone,
+	"billed_at" timestamp with time zone,
+	"cancelled_at" timestamp with time zone,
+	"bill_id" uuid,
+	"created_by" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "purchase_orders_order_number_unique" UNIQUE("order_number")
+);
+--> statement-breakpoint
 CREATE TABLE "role_permissions" (
 	"role" "role" NOT NULL,
 	"capability" text NOT NULL,
@@ -162,6 +196,33 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_token_identifier_unique" UNIQUE("token_identifier")
 );
 --> statement-breakpoint
+CREATE TABLE "vendor_bill_line_items" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"vendor_bill_id" uuid NOT NULL,
+	"product_id" uuid,
+	"description" text NOT NULL,
+	"quantity" numeric(14, 3) NOT NULL,
+	"unit_price" numeric(14, 2) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "vendor_bills" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"bill_number" text NOT NULL,
+	"status" "vendor_bill_status" DEFAULT 'draft' NOT NULL,
+	"vendor_contact_id" uuid,
+	"vendor_company_id" uuid,
+	"bill_date" timestamp with time zone NOT NULL,
+	"due_date" timestamp with time zone NOT NULL,
+	"notes" text,
+	"tax_rate" numeric(6, 3) NOT NULL,
+	"subtotal" numeric(14, 2) NOT NULL,
+	"tax_amount" numeric(14, 2) NOT NULL,
+	"total" numeric(14, 2) NOT NULL,
+	"created_by" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "vendor_bills_bill_number_unique" UNIQUE("bill_number")
+);
+--> statement-breakpoint
 ALTER TABLE "activities" ADD CONSTRAINT "activities_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "activities" ADD CONSTRAINT "activities_author_id_users_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -178,6 +239,11 @@ ALTER TABLE "invoices" ADD CONSTRAINT "invoices_contact_id_contacts_id_fk" FOREI
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "products" ADD CONSTRAINT "products_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "purchase_order_line_items" ADD CONSTRAINT "purchase_order_line_items_purchase_order_id_purchase_orders_id_fk" FOREIGN KEY ("purchase_order_id") REFERENCES "public"."purchase_orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "purchase_order_line_items" ADD CONSTRAINT "purchase_order_line_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_vendor_contact_id_contacts_id_fk" FOREIGN KEY ("vendor_contact_id") REFERENCES "public"."contacts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_vendor_company_id_companies_id_fk" FOREIGN KEY ("vendor_company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sales_order_line_items" ADD CONSTRAINT "sales_order_line_items_sales_order_id_sales_orders_id_fk" FOREIGN KEY ("sales_order_id") REFERENCES "public"."sales_orders"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sales_order_line_items" ADD CONSTRAINT "sales_order_line_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -185,4 +251,9 @@ ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_company_id_companies_id_
 ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stock_adjustments" ADD CONSTRAINT "stock_adjustments_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "stock_adjustments" ADD CONSTRAINT "stock_adjustments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "stock_adjustments" ADD CONSTRAINT "stock_adjustments_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_bill_line_items" ADD CONSTRAINT "vendor_bill_line_items_vendor_bill_id_vendor_bills_id_fk" FOREIGN KEY ("vendor_bill_id") REFERENCES "public"."vendor_bills"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_bill_line_items" ADD CONSTRAINT "vendor_bill_line_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_bills" ADD CONSTRAINT "vendor_bills_vendor_contact_id_contacts_id_fk" FOREIGN KEY ("vendor_contact_id") REFERENCES "public"."contacts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_bills" ADD CONSTRAINT "vendor_bills_vendor_company_id_companies_id_fk" FOREIGN KEY ("vendor_company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "vendor_bills" ADD CONSTRAINT "vendor_bills_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;

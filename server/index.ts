@@ -13,9 +13,11 @@ import dealStagesRouter from "./routes/dealStages.ts";
 import invoicesRouter from "./routes/invoices.ts";
 import portalRouter from "./routes/portal.ts";
 import productsRouter from "./routes/products.ts";
+import purchaseOrdersRouter from "./routes/purchaseOrders.ts";
 import salesOrdersRouter from "./routes/salesOrders.ts";
 import stockAdjustmentsRouter from "./routes/stockAdjustments.ts";
 import usersRouter from "./routes/users.ts";
+import vendorBillsRouter from "./routes/vendorBills.ts";
 
 const app = express();
 
@@ -34,6 +36,8 @@ app.use(productsRouter);
 app.use(stockAdjustmentsRouter);
 app.use(invoicesRouter);
 app.use(salesOrdersRouter);
+app.use(purchaseOrdersRouter);
+app.use(vendorBillsRouter);
 app.use(portalRouter);
 app.use(dashboardRouter);
 

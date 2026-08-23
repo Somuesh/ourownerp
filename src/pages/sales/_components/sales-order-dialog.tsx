@@ -174,7 +174,7 @@ export default function SalesOrderDialog({
   }, 0);
   const taxAmount = subtotal * ((Number(watchedTaxRate) || 0) / 100);
   const total = subtotal + taxAmount;
-  const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+  const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
   const handleProductSelect = (index: number, productId: string) => {
     form.setValue(`lineItems.${index}.productId`, productId);

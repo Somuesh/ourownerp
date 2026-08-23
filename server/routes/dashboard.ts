@@ -11,15 +11,25 @@ router.get(
   asyncHandler(async (req, res) => {
     await requireStaffOrAdmin(req);
 
-    const [allDeals, allDealStages, allProducts, allInvoices, allContacts, allCompanies] =
-      await Promise.all([
-        db.query.deals.findMany(),
-        db.query.dealStages.findMany({ orderBy: (s, { asc }) => asc(s.sortOrder) }),
-        db.query.products.findMany(),
-        db.query.invoices.findMany({ orderBy: (i, { desc }) => desc(i.createdAt) }),
-        db.query.contacts.findMany(),
-        db.query.companies.findMany(),
-      ]);
+    const [
+      allDeals,
+      allDealStages,
+      allProducts,
+      allInvoices,
+      allContacts,
+      allCompanies,
+      allPurchaseOrders,
+      allVendorBills,
+    ] = await Promise.all([
+      db.query.deals.findMany(),
+      db.query.dealStages.findMany({ orderBy: (s, { asc }) => asc(s.sortOrder) }),
+      db.query.products.findMany(),
+      db.query.invoices.findMany({ orderBy: (i, { desc }) => desc(i.createdAt) }),
+      db.query.contacts.findMany(),
+      db.query.companies.findMany(),
+      db.query.purchaseOrders.findMany(),
+      db.query.vendorBills.findMany(),
+    ]);
     const contactNameById = new Map(allContacts.map((c) => [c.id, c.name]));
     const companyNameById = new Map(allCompanies.map((c) => [c.id, c.name]));
     const stageById = new Map(allDealStages.map((s) => [s.id, s]));
@@ -79,6 +89,26 @@ router.get(
       (contactId && contactNameById.get(contactId)) ??
       null;
 
+    // Purchasing mirrors the invoice math above: "open" purchase orders are
+    // draft/confirmed (not yet received), "outstanding" bills are unpaid.
+    let openPurchaseOrdersCount = 0;
+    let openPurchaseOrdersValue = 0;
+    for (const order of allPurchaseOrders) {
+      if (order.status === "draft" || order.status === "confirmed") {
+        openPurchaseOrdersCount += 1;
+        openPurchaseOrdersValue += Number(order.total);
+      }
+    }
+
+    let outstandingBillsCount = 0;
+    let outstandingBillsValue = 0;
+    for (const bill of allVendorBills) {
+      if (bill.status === "open" || bill.status === "overdue") {
+        outstandingBillsCount += 1;
+        outstandingBillsValue += Number(bill.total);
+      }
+    }
+
     const recentInvoices = allInvoices.slice(0, 5).map((invoice) => ({
       _id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -111,6 +141,10 @@ router.get(
       invoicesByStatus,
       recentInvoices,
       recentDeals,
+      openPurchaseOrdersCount,
+      openPurchaseOrdersValue,
+      outstandingBillsCount,
+      outstandingBillsValue,
     });
   }),
 );

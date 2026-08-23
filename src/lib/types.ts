@@ -158,6 +158,10 @@ export interface DashboardOverview {
     stageName: string;
     partyName: string | null;
   }>;
+  openPurchaseOrdersCount: number;
+  openPurchaseOrdersValue: number;
+  outstandingBillsCount: number;
+  outstandingBillsValue: number;
 }
 
 export type SalesOrderStatus = "draft" | "confirmed" | "delivered" | "invoiced" | "cancelled";
@@ -191,6 +195,74 @@ export interface SalesOrderWithParty extends SalesOrder {
 export interface SalesOrderLineItem {
   _id: string;
   salesOrderId: string;
+  productId?: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export type PurchaseOrderStatus = "draft" | "confirmed" | "received" | "billed" | "cancelled";
+export type VendorBillStatus = "draft" | "open" | "paid" | "overdue";
+
+export interface PurchaseOrder {
+  _id: string;
+  orderNumber: string;
+  status: PurchaseOrderStatus;
+  vendorContactId?: string | null;
+  vendorCompanyId?: string | null;
+  orderDateIso: string;
+  expectedReceiptDateIso?: string | null;
+  notes?: string | null;
+  taxRate: number;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  confirmedAtIso?: string | null;
+  receivedAtIso?: string | null;
+  billedAtIso?: string | null;
+  cancelledAtIso?: string | null;
+  billId?: string | null;
+  createdBy: string;
+}
+
+export interface PurchaseOrderWithVendor extends PurchaseOrder {
+  vendorContactName: string | null;
+  vendorCompanyName: string | null;
+}
+
+export interface PurchaseOrderLineItem {
+  _id: string;
+  purchaseOrderId: string;
+  productId?: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface VendorBill {
+  _id: string;
+  billNumber: string;
+  status: VendorBillStatus;
+  vendorContactId?: string | null;
+  vendorCompanyId?: string | null;
+  billDateIso: string;
+  dueDateIso: string;
+  notes?: string | null;
+  taxRate: number;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  createdBy: string;
+}
+
+export interface VendorBillWithVendor extends VendorBill {
+  vendorContactName: string | null;
+  vendorCompanyName: string | null;
+}
+
+export interface VendorBillLineItem {
+  _id: string;
+  vendorBillId: string;
   productId?: string | null;
   description: string;
   quantity: number;

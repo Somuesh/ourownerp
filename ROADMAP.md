@@ -14,7 +14,7 @@ Manufacturing. Voice assistant lands after Sales + Purchasing exist.
 - [x] **Phase 1 — Sales**: Quotation → Sales Order → Delivery → Invoice →
       Payment, replacing today's flat invoice-only flow. Line items carry
       state (quoted/confirmed/delivered/invoiced).
-- [ ] **Phase 2 — Purchasing**: Vendors, Purchase Orders, Vendor Bills,
+- [x] **Phase 2 — Purchasing**: Vendors, Purchase Orders, Vendor Bills,
       receiving flow. Mirrors Sales structurally.
 - [ ] **Phase 3 — Voice assistant v1**: speech-to-text → intent parsing →
       calls the same API endpoints Sales/Purchasing expose. Asks for

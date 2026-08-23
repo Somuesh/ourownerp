@@ -57,7 +57,10 @@ import {
 import ProductDialog from "./_components/product-dialog.tsx";
 import StockAdjustmentDialog from "./_components/stock-adjustment-dialog.tsx";
 
-const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
 
 export default function Inventory() {
   const api = useApiClient();
