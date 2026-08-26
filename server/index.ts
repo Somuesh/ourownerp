@@ -18,6 +18,7 @@ import salesOrdersRouter from "./routes/salesOrders.ts";
 import stockAdjustmentsRouter from "./routes/stockAdjustments.ts";
 import usersRouter from "./routes/users.ts";
 import vendorBillsRouter from "./routes/vendorBills.ts";
+import voiceRouter from "./routes/voice.ts";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use(purchaseOrdersRouter);
 app.use(vendorBillsRouter);
 app.use(portalRouter);
 app.use(dashboardRouter);
+app.use(voiceRouter);
 
 app.use(
   (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

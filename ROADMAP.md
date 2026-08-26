@@ -16,7 +16,7 @@ Manufacturing. Voice assistant lands after Sales + Purchasing exist.
       state (quoted/confirmed/delivered/invoiced).
 - [x] **Phase 2 — Purchasing**: Vendors, Purchase Orders, Vendor Bills,
       receiving flow. Mirrors Sales structurally.
-- [ ] **Phase 3 — Voice assistant v1**: speech-to-text → intent parsing →
+- [x] **Phase 3 — Voice assistant v1**: speech-to-text → intent parsing →
       calls the same API endpoints Sales/Purchasing expose. Asks for
       missing required fields, confirms before executing. Scoped to
       Sales + Purchasing intents at this stage.

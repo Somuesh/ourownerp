@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import {
   SidebarInset,
   SidebarProvider,
@@ -10,9 +11,11 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { Building2 } from "lucide-react";
 import AppSidebar from "./_components/app-sidebar.tsx";
+import VoiceAssistant from "@/components/voice-assistant/voice-assistant.tsx";
 
 export default function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { hasRole } = useCurrentUser();
 
   if (isLoading) {
     return (
@@ -57,6 +60,7 @@ export default function AppLayout() {
           <Outlet />
         </div>
       </SidebarInset>
+      {hasRole(["admin", "staff"]) && <VoiceAssistant />}
     </SidebarProvider>
   );
 }
