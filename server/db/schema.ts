@@ -339,6 +339,30 @@ export const auditLog = pgTable("audit_log", {
 });
 
 // ---------------------------------------------------------------------------
+// Voice assistant — Phase 3. One row per conversational turn: what the user
+// said, what the assistant replied, and every tool call it made along the
+// way (each already produces its own audit_log rows via the normal REST
+// routes it calls — this table is the human-readable "chatter" view of the
+// whole exchange, not a second source of truth for what changed).
+// ---------------------------------------------------------------------------
+
+export const voiceCommandLogs = pgTable("voice_command_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: text("session_id").notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  language: text("language"),
+  userTranscript: text("user_transcript").notNull(),
+  assistantReply: text("assistant_reply").notNull(),
+  // Array of { name, input, result, isError } — one entry per tool call
+  // made while producing this turn's reply. Empty for a turn that was
+  // pure conversation (a clarifying question, a confirmation ask).
+  toolCalls: jsonb("tool_calls").notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // Platform: permissions — per-role capability grants, seeded with defaults
 // but editable at runtime (Settings > Roles, future phase) rather than
 // hardcoded in route files. See server/permissions.ts for how routes use it.

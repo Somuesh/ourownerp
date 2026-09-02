@@ -268,3 +268,21 @@ export interface VendorBillLineItem {
   quantity: number;
   unitPrice: number;
 }
+
+export interface VoiceToolCallRecord {
+  name: string;
+  input: Record<string, unknown>;
+  result: unknown;
+  isError: boolean;
+}
+
+export interface VoiceCommandLog {
+  _id: string;
+  sessionId: string;
+  userName: string;
+  language: string | null;
+  userTranscript: string;
+  assistantReply: string;
+  toolCalls: VoiceToolCallRecord[];
+  createdAtIso: string;
+}

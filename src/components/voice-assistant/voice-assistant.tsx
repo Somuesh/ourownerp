@@ -24,6 +24,26 @@ interface Turn {
 }
 
 const PROVIDER_STORAGE_KEY = "voice-assistant-provider";
+const LANGUAGE_STORAGE_KEY = "voice-assistant-language";
+const VOICE_STORAGE_KEY = "voice-assistant-voice";
+
+// BCP-47 recognition tag + a plain-language name sent to the AI so it
+// knows to reply in that language, not just the same tag back. Speech
+// recognition quality for non-English languages depends on what the
+// browser/OS speech engine supports — Chrome covers most of these
+// reasonably; results vary elsewhere.
+const LANGUAGES = [
+  { code: "en-US", label: "English" },
+  { code: "hi-IN", label: "Hindi" },
+  { code: "es-ES", label: "Spanish" },
+  { code: "fr-FR", label: "French" },
+  { code: "de-DE", label: "German" },
+  { code: "ar-SA", label: "Arabic" },
+  { code: "pt-BR", label: "Portuguese" },
+  { code: "zh-CN", label: "Chinese (Mandarin)" },
+  { code: "ja-JP", label: "Japanese" },
+  { code: "ru-RU", label: "Russian" },
+];
 
 export default function VoiceAssistant() {
   const api = useApiClient();
@@ -41,6 +61,10 @@ export default function VoiceAssistant() {
   const [providerId, setProviderId] = useState(
     () => localStorage.getItem(PROVIDER_STORAGE_KEY) ?? "",
   );
+  const [languageCode, setLanguageCode] = useState(
+    () => localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? "en-US",
+  );
+  const [voiceURI, setVoiceURI] = useState(() => localStorage.getItem(VOICE_STORAGE_KEY) ?? "");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,23 +78,41 @@ export default function VoiceAssistant() {
   }, [providerId]);
 
   useEffect(() => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+  }, [languageCode]);
+
+  useEffect(() => {
+    if (voiceURI) localStorage.setItem(VOICE_STORAGE_KEY, voiceURI);
+    else localStorage.removeItem(VOICE_STORAGE_KEY);
+  }, [voiceURI]);
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns]);
 
-  const { speak, stop: stopSpeaking } = useSpeechSynthesis();
+  const { voices, speak, stop: stopSpeaking } = useSpeechSynthesis();
+  const languageLabel = LANGUAGES.find((l) => l.code === languageCode)?.label ?? "English";
+  const voicesForLanguage = voices.filter((v) =>
+    v.lang.toLowerCase().startsWith(languageCode.split("-")[0].toLowerCase()),
+  );
 
   const sendCommand = async (transcript: string) => {
     if (!transcript.trim() || !providerId) return;
     setTurns((prev) => [...prev, { role: "user", text: transcript }]);
     setStatus("thinking");
     try {
-      const result = await api.post("/voice/command", { sessionId, transcript, providerId });
+      const result = await api.post("/voice/command", {
+        sessionId,
+        transcript,
+        providerId,
+        language: languageLabel,
+      });
       setTurns((prev) => [
         ...prev,
         { role: "assistant", text: result.reply, resultPath: result.resultPath },
       ]);
       setStatus("speaking");
-      speak(result.reply);
+      speak(result.reply, { lang: languageCode, voiceURI: voiceURI || undefined });
       setTimeout(() => setStatus("idle"), 300);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Something went wrong";
@@ -80,11 +122,13 @@ export default function VoiceAssistant() {
   };
 
   const { isSupported: micSupported, isListening, start, stop } = useSpeechRecognition({
+    lang: languageCode,
     onResult: (transcript) => sendCommand(transcript),
     onError: (message) => {
       setTurns((prev) => [...prev, { role: "assistant", text: message }]);
       setStatus("idle");
     },
+    onEnd: () => setStatus("idle"),
   });
 
   const handleMicClick = () => {
@@ -138,7 +182,7 @@ export default function VoiceAssistant() {
   const noProvidersConfigured = providers !== undefined && providers.length === 0;
 
   return (
-    <Card className="fixed bottom-6 right-6 z-50 flex h-[32rem] w-96 flex-col shadow-xl">
+    <Card className="fixed bottom-6 right-6 z-50 flex h-[36rem] w-96 flex-col shadow-xl">
       <CardHeader className="flex-row items-center justify-between space-y-0 border-b py-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Sparkles className="size-4" />
@@ -154,7 +198,7 @@ export default function VoiceAssistant() {
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-1 flex-col gap-3 overflow-hidden p-3">
+      <CardContent className="flex flex-1 flex-col gap-2 overflow-hidden p-3">
         {noProvidersConfigured ? (
           <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
             No AI provider is configured yet. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or
@@ -162,15 +206,53 @@ export default function VoiceAssistant() {
           </div>
         ) : (
           <>
-            {providers && providers.length > 1 && (
-              <Select value={providerId} onValueChange={setProviderId}>
-                <SelectTrigger className="h-8 w-full text-xs">
-                  <SelectValue placeholder="Choose an AI provider" />
+            <div className="grid grid-cols-2 gap-2">
+              {providers && providers.length > 1 && (
+                <Select value={providerId} onValueChange={setProviderId}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="AI provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select
+                value={languageCode}
+                onValueChange={(v) => {
+                  setLanguageCode(v);
+                  setVoiceURI("");
+                }}
+              >
+                <SelectTrigger
+                  className={providers && providers.length > 1 ? "h-8 text-xs" : "col-span-2 h-8 text-xs"}
+                >
+                  <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent>
-                  {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.label}
+                  {LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      {l.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {voicesForLanguage.length > 0 && (
+              <Select value={voiceURI || "__auto__"} onValueChange={(v) => setVoiceURI(v === "__auto__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Voice" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Auto (best available)</SelectItem>
+                  {voicesForLanguage.map((v) => (
+                    <SelectItem key={v.voiceURI} value={v.voiceURI}>
+                      {v.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

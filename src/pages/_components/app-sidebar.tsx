@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   FileText,
   Settings,
+  Mic,
   Building2,
   UserCircle,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { ThemeToggle } from "@/components/theme/theme-toggle.tsx";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "staff"] as const },
@@ -106,6 +108,14 @@ export default function AppSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={location.pathname === "/settings/voice-activity"}>
+                <Link to="/settings/voice-activity">
+                  <Mic />
+                  <span>Voice activity</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         )}
         <div className="flex items-center gap-2 px-2 py-1.5">
@@ -121,6 +131,9 @@ export default function AppSidebar() {
             <span className="truncate text-[11px] text-sidebar-foreground/60">
               {user?.email ?? authUser?.profile.email}
             </span>
+          </div>
+          <div className="shrink-0 group-data-[collapsible=icon]:hidden">
+            <ThemeToggle />
           </div>
           {user && (
             <Badge

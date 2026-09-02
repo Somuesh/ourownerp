@@ -17,6 +17,7 @@ import VendorBills from "./pages/purchasing/VendorBills.tsx";
 import Portal from "./pages/portal/Portal.tsx";
 import PortalInvoiceDetail from "./pages/portal/PortalInvoiceDetails.tsx";
 import SettingsUsers from "./pages/settings/Users.tsx";
+import VoiceActivity from "./pages/settings/VoiceActivity.tsx";
 import RequireRole from "./components/require-roles.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -62,6 +63,14 @@ export default function App() {
               element={
                 <RequireRole roles={["admin"]}>
                   <SettingsUsers />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/settings/voice-activity"
+              element={
+                <RequireRole roles={["admin"]}>
+                  <VoiceActivity />
                 </RequireRole>
               }
             />
