@@ -297,3 +297,49 @@ export interface UserInvite {
   acceptedAtIso: string | null;
   revokedAtIso: string | null;
 }
+
+export interface Warehouse {
+  _id: string;
+  name: string;
+  code: string;
+  address?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+}
+
+export interface StockOverview {
+  warehouses: Warehouse[];
+  products: {
+    _id: string;
+    name: string;
+    sku: string;
+    total: number;
+    lowStockThreshold: number;
+    quantities: Record<string, number>;
+  }[];
+}
+
+export interface StockTransfer {
+  _id: string;
+  transferNumber: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  fromWarehouseId: string;
+  fromWarehouseName: string;
+  toWarehouseId: string;
+  toWarehouseName: string;
+  quantity: number;
+  note?: string | null;
+  createdByName?: string | null;
+  createdAtIso: string;
+}
+
+export interface ReorderItem {
+  _id: string;
+  name: string;
+  sku: string;
+  stockQuantity: number;
+  lowStockThreshold: number;
+  suggestedReorderQuantity: number;
+}

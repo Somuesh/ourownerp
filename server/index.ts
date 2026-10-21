@@ -3,7 +3,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { AppError } from "./auth.ts";
-import { seedDealStages, seedPermissions } from "./db/seed.ts";
+import { seedDealStages, seedPermissions, seedWarehouses } from "./db/seed.ts";
 import activitiesRouter from "./routes/activities.ts";
 import companiesRouter from "./routes/companies.ts";
 import contactsRouter from "./routes/contacts.ts";
@@ -16,6 +16,7 @@ import productsRouter from "./routes/products.ts";
 import purchaseOrdersRouter from "./routes/purchaseOrders.ts";
 import salesOrdersRouter from "./routes/salesOrders.ts";
 import stockAdjustmentsRouter from "./routes/stockAdjustments.ts";
+import warehousesRouter from "./routes/warehouses.ts";
 import userInvitesRouter from "./routes/userInvites.ts";
 import usersRouter from "./routes/users.ts";
 import vendorBillsRouter from "./routes/vendorBills.ts";
@@ -37,6 +38,7 @@ app.use(dealStagesRouter);
 app.use(activitiesRouter);
 app.use(productsRouter);
 app.use(stockAdjustmentsRouter);
+app.use(warehousesRouter);
 app.use(invoicesRouter);
 app.use(salesOrdersRouter);
 app.use(purchaseOrdersRouter);
@@ -61,6 +63,7 @@ async function main() {
   // these only seed empty tables with sensible defaults.
   await seedPermissions();
   await seedDealStages();
+  await seedWarehouses();
 
   const port = Number(process.env.PORT ?? 3001);
   app.listen(port, () => {

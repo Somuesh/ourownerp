@@ -181,6 +181,54 @@ export const VOICE_TOOLS: ToolDefinition[] = [
     },
   },
 
+  // ---- Warehouses ---------------------------------------------------------
+  {
+    name: "list_warehouses",
+    description: "List all warehouses/locations with their IDs. Use this to resolve a warehouse name to an ID before transferring stock.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "create_warehouse",
+    description: "Create a new warehouse/location.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        code: { type: "string", description: "Short code, optional." },
+        address: { type: "string" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "get_stock_by_warehouse",
+    description: "Show how much of products is held in each warehouse. Optionally filter by product name/SKU.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "Optional partial product name or SKU." } },
+    },
+  },
+  {
+    name: "transfer_stock",
+    description: "Move stock of a product from one warehouse to another.",
+    parameters: {
+      type: "object",
+      properties: {
+        productId: { type: "string", description: "Look up with search_products first." },
+        fromWarehouseId: { type: "string", description: "Look up with list_warehouses." },
+        toWarehouseId: { type: "string", description: "Look up with list_warehouses." },
+        quantity: { type: "number", description: "Whole units to move." },
+        note: { type: "string" },
+      },
+      required: ["productId", "fromWarehouseId", "toWarehouseId", "quantity"],
+    },
+  },
+  {
+    name: "get_reorder_report",
+    description: "List products at or below their low-stock threshold with a suggested reorder quantity.",
+    parameters: { type: "object", properties: {} },
+  },
+
   // ---- Sales ------------------------------------------------------------
   {
     name: "create_sales_order",

@@ -1,5 +1,5 @@
 import { db } from "./client.ts";
-import { dealStages, rolePermissions } from "./schema.ts";
+import { dealStages, rolePermissions, warehouses } from "./schema.ts";
 import { DEFAULT_GRANTS } from "../permissions.ts";
 
 /** Populates `role_permissions` with the default grants the first time the
@@ -40,4 +40,12 @@ export async function seedDealStages(): Promise<void> {
     { name: "Lost", sortOrder: 4, isLost: true },
   ]);
   console.log("Seeded default deal stages.");
+}
+
+/** Creates the default "Main Warehouse" on first boot. All pre-existing stock
+ * is implicitly held there (see schema.ts note on stock_levels). */
+export async function seedWarehouses(): Promise<void> {
+  const existing = await db.select({ id: warehouses.id }).from(warehouses).limit(1);
+  if (existing.length > 0) return;
+  await db.insert(warehouses).values({ name: "Main Warehouse", code: "MAIN", isDefault: true });
 }

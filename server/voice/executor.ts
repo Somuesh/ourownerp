@@ -142,6 +142,40 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
       reason: input.reason,
     }),
 
+  // ---- Warehouses ----------------------------------------------------------
+  list_warehouses: async (_input, ctx) => {
+    const all = await callApi("GET", "/warehouses", ctx.authHeader);
+    return pick(all, ["_id", "name", "code", "isDefault", "isActive"]);
+  },
+  create_warehouse: async (input, ctx) => {
+    const result = await callApi("POST", "/warehouses", ctx.authHeader, input);
+    ctx.setResultPath("/inventory/warehouses");
+    return result;
+  },
+  get_stock_by_warehouse: async (input, ctx) => {
+    const data = await callApi("GET", "/inventory/stock", ctx.authHeader);
+    const names = new Map<string, string>(data.warehouses.map((w: any) => [w._id, w.name]));
+    const rows = data.products
+      .filter((p: any) => !input.query || matches(p.name, input.query) || matches(p.sku, input.query))
+      .slice(0, 25)
+      .map((p: any) => ({
+        _id: p._id,
+        name: p.name,
+        sku: p.sku,
+        total: p.total,
+        byWarehouse: Object.fromEntries(
+          Object.entries(p.quantities).map(([id, q]) => [names.get(id) ?? id, q]),
+        ),
+      }));
+    return rows;
+  },
+  transfer_stock: async (input, ctx) => {
+    const result = await callApi("POST", "/stock-transfers", ctx.authHeader, input);
+    ctx.setResultPath("/inventory/warehouses");
+    return result;
+  },
+  get_reorder_report: async (_input, ctx) => callApi("GET", "/inventory/reorder", ctx.authHeader),
+
   // ---- Sales --------------------------------------------------------------
   create_sales_order: async (input, ctx) => {
     const result = await callApi("POST", "/sales-orders", ctx.authHeader, input);

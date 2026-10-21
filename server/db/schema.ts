@@ -159,6 +159,57 @@ export const stockAdjustments = pgTable("stock_adjustments", {
 });
 
 // ---------------------------------------------------------------------------
+// Warehouses (Phase 4)
+// products.stockQuantity stays the company-wide total. The default warehouse's
+// quantity is implicit: total minus everything held in other warehouses.
+// Only non-default warehouses get rows in stock_levels.
+// ---------------------------------------------------------------------------
+
+export const warehouses = pgTable("warehouses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  code: text("code").notNull().unique(),
+  address: text("address"),
+  isDefault: boolean("is_default").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const stockLevels = pgTable(
+  "stock_levels",
+  {
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    warehouseId: uuid("warehouse_id")
+      .notNull()
+      .references(() => warehouses.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.warehouseId] })],
+);
+
+export const stockTransfers = pgTable("stock_transfers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  transferNumber: text("transfer_number").notNull().unique(),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  fromWarehouseId: uuid("from_warehouse_id")
+    .notNull()
+    .references(() => warehouses.id),
+  toWarehouseId: uuid("to_warehouse_id")
+    .notNull()
+    .references(() => warehouses.id),
+  quantity: integer("quantity").notNull(),
+  note: text("note"),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // Invoicing (Sales/Purchasing in later phases will follow this same shape)
 // ---------------------------------------------------------------------------
 
