@@ -179,6 +179,9 @@ export const invoices = pgTable("invoices", {
     .notNull()
     .references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Set by POST /invoices/:id/send-email — lets the UI show "last emailed"
+  // and distinguish "Send email" from "Resend email".
+  lastEmailedAt: timestamp("last_emailed_at", { withTimezone: true }),
 });
 
 export const invoiceLineItems = pgTable("invoice_line_items", {
@@ -377,6 +380,25 @@ export const rolePermissions = pgTable(
   },
   (table) => [primaryKey({ columns: [table.role, table.capability] })],
 );
+
+// ---------------------------------------------------------------------------
+// User invites — the very first user to ever sign in becomes admin
+// (bootstrap); everyone after that must have a matching, unused invite for
+// their email or /users/sync rejects them (see server/routes/users.ts).
+// OIDC login alone only proves who someone is, not that they're allowed in.
+// ---------------------------------------------------------------------------
+
+export const userInvites = pgTable("user_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  role: roleEnum("role").notNull(),
+  invitedBy: uuid("invited_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+});
 
 // ---------------------------------------------------------------------------
 // Relations (used by Drizzle's relational query API where convenient)

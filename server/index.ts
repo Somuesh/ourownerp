@@ -16,6 +16,7 @@ import productsRouter from "./routes/products.ts";
 import purchaseOrdersRouter from "./routes/purchaseOrders.ts";
 import salesOrdersRouter from "./routes/salesOrders.ts";
 import stockAdjustmentsRouter from "./routes/stockAdjustments.ts";
+import userInvitesRouter from "./routes/userInvites.ts";
 import usersRouter from "./routes/users.ts";
 import vendorBillsRouter from "./routes/vendorBills.ts";
 import voiceRouter from "./routes/voice.ts";
@@ -28,6 +29,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use(usersRouter);
+app.use(userInvitesRouter);
 app.use(companiesRouter);
 app.use(contactsRouter);
 app.use(dealsRouter);

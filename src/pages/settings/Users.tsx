@@ -29,6 +29,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
+import { InviteUserSection } from "./_components/invite-user-section.tsx";
 
 const roleLabel: Record<Role, string> = {
   admin: "Admin",
@@ -103,6 +104,8 @@ export default function SettingsUsers() {
           </p>
         </div>
       </div>
+
+      <InviteUserSection />
 
       <Card>
         <CardHeader>

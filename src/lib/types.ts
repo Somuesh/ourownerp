@@ -110,6 +110,7 @@ export interface Invoice {
   taxAmount: number;
   total: number;
   createdBy: string;
+  lastEmailedAtIso?: string | null;
 }
 
 export interface InvoiceWithParty extends Invoice {
@@ -285,4 +286,14 @@ export interface VoiceCommandLog {
   assistantReply: string;
   toolCalls: VoiceToolCallRecord[];
   createdAtIso: string;
+}
+
+export interface UserInvite {
+  _id: string;
+  email: string;
+  role: Role;
+  invitedByName: string | null;
+  createdAtIso: string;
+  acceptedAtIso: string | null;
+  revokedAtIso: string | null;
 }

@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Router } from "express";
 import { recordAudit } from "../audit.ts";
 import { AppError, asyncHandler, getCurrentUser, getIdentity, requireAdmin } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { users } from "../db/schema.ts";
+import { userInvites, users } from "../db/schema.ts";
 
 const router = Router();
 
@@ -18,8 +18,16 @@ function rowToUser(row: typeof users.$inferSelect) {
 }
 
 /** Called once right after login. Creates the local `users` row for this
- * identity the first time it's seen (first-ever user becomes admin,
- * everyone after starts as staff). Idempotent on repeat calls. */
+ * identity the first time it's seen.
+ *
+ * Security note: this used to auto-create a "staff" account for ANY
+ * successfully authenticated OIDC identity — meaning anyone with a Google
+ * account (or whatever your OIDC provider is) could sign in and get real
+ * access. OIDC login only proves *who* someone is, not that they're
+ * allowed in. Fixed here: the very first user ever becomes admin
+ * (bootstrap, so you can get started at all); after that, signing in only
+ * creates an account if there's a matching, unused invite for that email
+ * (see server/routes/userInvites.ts) — everyone else is rejected. */
 router.post(
   "/users/sync",
   asyncHandler(async (req, res) => {
@@ -33,23 +41,71 @@ router.post(
     }
 
     const [anyUser] = await db.select({ id: users.id }).from(users).limit(1);
-    const role = anyUser ? "staff" : "admin";
+
+    if (!anyUser) {
+      const [created] = await db
+        .insert(users)
+        .values({
+          tokenIdentifier: identity.sub,
+          name: identity.name ?? null,
+          email: identity.email ?? null,
+          role: "admin",
+        })
+        .returning({ id: users.id });
+
+      await recordAudit({
+        actorId: created.id,
+        action: "create",
+        entityType: "user",
+        entityId: created.id,
+        changes: { role: "admin", email: identity.email ?? null, bootstrap: true },
+      });
+
+      res.json({ _id: created.id });
+      return;
+    }
+
+    if (!identity.email) {
+      throw new AppError(
+        403,
+        "Your account doesn't expose an email address we can match to an invite.",
+      );
+    }
+    const normalizedEmail = identity.email.toLowerCase();
+
+    const invite = await db.query.userInvites.findFirst({
+      where: and(
+        eq(userInvites.email, normalizedEmail),
+        isNull(userInvites.acceptedAt),
+        isNull(userInvites.revokedAt),
+      ),
+    });
+
+    if (!invite) {
+      throw new AppError(
+        403,
+        "Your account isn't invited to Our ERP yet. Ask an admin to invite you, then sign in again.",
+      );
+    }
+
     const [created] = await db
       .insert(users)
       .values({
         tokenIdentifier: identity.sub,
         name: identity.name ?? null,
-        email: identity.email ?? null,
-        role,
+        email: identity.email,
+        role: invite.role,
       })
       .returning({ id: users.id });
+
+    await db.update(userInvites).set({ acceptedAt: new Date() }).where(eq(userInvites.id, invite.id));
 
     await recordAudit({
       actorId: created.id,
       action: "create",
       entityType: "user",
       entityId: created.id,
-      changes: { role, email: identity.email ?? null },
+      changes: { role: invite.role, email: identity.email, fromInvite: invite.id },
     });
 
     res.json({ _id: created.id });

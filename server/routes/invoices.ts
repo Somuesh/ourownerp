@@ -5,6 +5,10 @@ import { AppError, asyncHandler, requireStaffOrAdmin } from "../auth.ts";
 import { db } from "../db/client.ts";
 import { companies, contacts, invoiceLineItems, invoices } from "../db/schema.ts";
 import { nextSequenceNumber } from "../db/sequences.ts";
+import { isEmailConfigured } from "../email/client.ts";
+import { generateInvoicePdfBuffer } from "../email/invoice-pdf.ts";
+import { sendMail } from "../email/send.ts";
+import { invoiceEmailTemplate } from "../email/templates.ts";
 
 const router = Router();
 
@@ -37,6 +41,7 @@ function rowToInvoice(row: typeof invoices.$inferSelect) {
     taxAmount: Number(row.taxAmount),
     total: Number(row.total),
     createdBy: row.createdBy,
+    lastEmailedAtIso: row.lastEmailedAt?.toISOString() ?? null,
   };
 }
 
@@ -245,6 +250,81 @@ router.patch(
       entityType: "invoice",
       entityId: req.params.id,
       changes: { status },
+    });
+
+    res.json(null);
+  }),
+);
+
+/** Generates a PDF server-side (separate from the client-side "Download
+ * PDF" button, which runs in the browser only) and emails it to the
+ * invoice's contact. Marks the invoice "sent" if it was still "draft". */
+router.post(
+  "/invoices/:id/send-email",
+  asyncHandler(async (req, res) => {
+    const user = await requireStaffOrAdmin(req);
+    if (!isEmailConfigured()) {
+      throw new AppError(500, "Email isn't configured on the server yet — set SMTP_* in .env.");
+    }
+
+    const [row] = await db
+      .select({
+        invoice: invoices,
+        contactName: contacts.name,
+        contactEmail: contacts.email,
+        companyName: companies.name,
+      })
+      .from(invoices)
+      .leftJoin(contacts, eq(contacts.id, invoices.contactId))
+      .leftJoin(companies, eq(companies.id, invoices.companyId))
+      .where(eq(invoices.id, req.params.id))
+      .limit(1);
+    if (!row) throw new AppError(404, "Invoice not found");
+
+    const recipientEmail = row.contactEmail;
+    if (!recipientEmail) {
+      throw new AppError(400, "This invoice's customer has no email address on file");
+    }
+
+    const lineItemRows = await db
+      .select()
+      .from(invoiceLineItems)
+      .where(eq(invoiceLineItems.invoiceId, req.params.id));
+
+    const invoice = rowToInvoice(row.invoice);
+    const pdfBuffer = await generateInvoicePdfBuffer(
+      { ...invoice, contactName: row.contactName, companyName: row.companyName },
+      lineItemRows.map(rowToLineItem),
+    );
+
+    const { subject, html, text } = invoiceEmailTemplate({
+      invoiceNumber: invoice.invoiceNumber,
+      total: `$${invoice.total.toFixed(2)}`,
+      dueDate: new Date(invoice.dueDateIso).toLocaleDateString(),
+    });
+
+    await sendMail({
+      to: recipientEmail,
+      subject,
+      html,
+      text,
+      attachments: [
+        { filename: `${invoice.invoiceNumber}.pdf`, content: pdfBuffer, contentType: "application/pdf" },
+      ],
+    });
+
+    const shouldMarkSent = row.invoice.status === "draft";
+    await db
+      .update(invoices)
+      .set({ lastEmailedAt: new Date(), ...(shouldMarkSent ? { status: "sent" as const } : {}) })
+      .where(eq(invoices.id, req.params.id));
+
+    await recordAudit({
+      actorId: user._id,
+      action: "update",
+      entityType: "invoice",
+      entityId: req.params.id,
+      changes: { emailedTo: recipientEmail },
     });
 
     res.json(null);

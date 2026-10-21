@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, FileText, MoreHorizontal, Plus } from "lucide-react";
-import { useApiClient } from "@/lib/api-client.ts";
+import { Download, FileText, Mail, MoreHorizontal, Plus } from "lucide-react";
+import { useApiClient, ApiError } from "@/lib/api-client.ts";
 import type { InvoiceLineItem, InvoiceStatus, InvoiceWithParty } from "@/lib/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -94,6 +94,10 @@ export default function Invoices() {
       api.patch(`/invoices/${invoiceId}/status`, { status }),
     onSuccess: invalidate,
   });
+  const sendInvoiceEmail = useMutation({
+    mutationFn: (invoiceId: string) => api.post(`/invoices/${invoiceId}/send-email`),
+    onSuccess: invalidate,
+  });
 
   const [view, setView] = useState<ViewMode>("list");
   const { isVisible: isColumnVisible, toggle: toggleColumn } = useColumnVisibility<InvoiceColumn>(
@@ -140,6 +144,15 @@ export default function Invoices() {
     }
   };
 
+  const handleSendEmail = async (invoiceId: string) => {
+    try {
+      await sendInvoiceEmail.mutateAsync(invoiceId);
+      toast.success("Invoice emailed");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Failed to send email");
+    }
+  };
+
   const handleDownload = async (invoiceId: string) => {
     setDownloadingId(invoiceId);
     try {
@@ -170,6 +183,10 @@ export default function Invoices() {
         >
           <Download className="size-3.5" />
           Download PDF
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleSendEmail(invoice._id)}>
+          <Mail className="size-3.5" />
+          {invoice.lastEmailedAtIso ? "Resend email" : "Send email"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Mark as</DropdownMenuLabel>
