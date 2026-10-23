@@ -14,9 +14,8 @@ services:
     runtime: node
     plan: free
     buildCommand: corepack enable && pnpm install --prod=false
-    # Applies the schema to the database before each deploy goes live.
-    preDeployCommand: corepack enable && pnpm db:push --force
-    startCommand: corepack enable && pnpm start:server
+    # Free tier has no pre-deploy command, so the schema is applied on every start.
+    startCommand: corepack enable && pnpm db:push --force && pnpm start:server
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
