@@ -63,6 +63,9 @@ if (fs.existsSync(path.join(distDir, "index.html"))) {
     if (req.method !== "GET" || !req.accepts("html")) return next();
     res.sendFile(path.join(distDir, "index.html"));
   });
+  console.log(`Serving frontend from ${distDir}`);
+} else {
+  console.warn(`No frontend build found at ${distDir} — API only. (Commit dist/ — see DEPLOY.md.)`);
 }
 
 app.use(
