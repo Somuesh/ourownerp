@@ -1,5 +1,7 @@
 # Render Blueprint for Our ERP: Postgres + ONE web service that runs the Express API
-# and also serves the built React app (same origin, so no CORS or separate static site).
+# and also serves the prebuilt React app from the committed dist/ folder (same origin).
+# The frontend is built on your machine, not on Render: the free plan's 512 MB of RAM
+# is too little for `vite build`.
 # The service name decides the public URL (https://<name>.onrender.com). If the name
 # is taken Render adds a suffix — then update VITE_API_URL / APP_URL and the OIDC
 # redirect URI to match, and redeploy.
@@ -14,16 +16,14 @@ services:
     name: our-erp-api
     runtime: node
     plan: free
-    # Installs everything, then builds the frontend into dist/ (VITE_* are read here).
-    buildCommand: corepack enable && pnpm install --prod=false && pnpm exec vite build
+    # Install only; dist/ is committed to the repo (see DEPLOY.md).
+    buildCommand: corepack enable && pnpm install --prod=false
     # Free tier has no pre-deploy command, so the schema is applied on every start.
     startCommand: corepack enable && pnpm db:push --force && pnpm start:server
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 22
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=460
       - key: DATABASE_URL
         fromDatabase:
           name: our-erp-db
@@ -32,18 +32,9 @@ services:
         value: "false"
       - key: APP_URL
         value: https://our-erp-api.onrender.com
-      - key: VITE_API_URL
-        value: https://our-erp-api.onrender.com
       - key: OIDC_AUTHORITY
         sync: false
       - key: OIDC_CLIENT_ID
-        sync: false
-      - key: VITE_OIDC_AUTHORITY
-        sync: false
-      - key: VITE_OIDC_CLIENT_ID
-        sync: false
-      # Only needed for Google (see DEPLOY.md note on client secrets).
-      - key: VITE_OIDC_CLIENT_SECRET
         sync: false
       # Optional: email (invites, invoices) and voice AI providers.
       - key: SMTP_HOST
