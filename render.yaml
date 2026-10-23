@@ -1,13 +1,15 @@
 # Render Blueprint for Our ERP: Postgres + ONE web service that runs the Express API
 # and also serves the prebuilt React app from the committed dist/ folder (same origin).
-# The frontend is built on your machine, not on Render: the free plan's 512 MB of RAM
-# is too little for `vite build`.
+# The frontend is built by GitHub Actions (.github/workflows/build-frontend.yml), not on
+# Render: the free plan's 512 MB of RAM is too little for `vite build`.
 # The service name decides the public URL (https://<name>.onrender.com). If the name
 # is taken Render adds a suffix — then update VITE_API_URL / APP_URL and the OIDC
 # redirect URI to match, and redeploy.
 databases:
   - name: our-erp-db
     plan: free
+    # Pinned: drizzle-kit 0.30's `push` breaks on Postgres 18's NOT NULL constraints.
+    postgresMajorVersion: "16"
     databaseName: ourerp
     user: ourerp
 
@@ -16,7 +18,7 @@ services:
     name: our-erp-api
     runtime: node
     plan: free
-    # Install only; dist/ is committed to the repo (see DEPLOY.md).
+    # Install only; dist/ is built and committed by GitHub Actions (see DEPLOY.md).
     buildCommand: corepack enable && pnpm install --prod=false
     # Free tier has no pre-deploy command, so the schema is applied on every start.
     startCommand: corepack enable && pnpm db:push --force && pnpm start:server
