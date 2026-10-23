@@ -1,41 +1,47 @@
-# Deploying Our ERP on Render
+# Deploying Our ERP on Render (free)
 
-## 1. Push to GitHub
+Render's free plan has 512 MB RAM, which is not enough to run `vite build`. So the
+frontend is **built on your computer and committed as `dist/`**; Render only installs
+the server and serves that folder.
+
+## 1. Build the frontend locally
+Create `.env.production.local` in the project root (git-ignored):
+```
+VITE_API_URL=https://our-erp-api.onrender.com
+VITE_OIDC_AUTHORITY=<same as OIDC_AUTHORITY>
+VITE_OIDC_CLIENT_ID=<same as OIDC_CLIENT_ID>
+VITE_OIDC_CLIENT_SECRET=<only for Google>
+```
+Then:
 ```bash
-git init && git add . && git commit -m "Our ERP"
-git branch -M main
-git remote add origin https://github.com/<you>/our-erp.git
-git push -u origin main
+pnpm install
+pnpm exec vite build      # creates dist/
 ```
-(`.env` is git-ignored — never commit secrets.)
+Redo this step whenever you change anything under `src/` or any `VITE_*` value.
 
-## 2. Create the Blueprint
-Render dashboard → **New → Blueprint** → pick the repo. It reads `render.yaml` and creates:
-- `our-erp-db` (Postgres)
-- `our-erp-api` (Express API; runs `pnpm db:push --force` before each deploy)
-- `our-erp-web` (static React site)
-
-Fill the prompted values (see step 3). Optional ones (SMTP, AI keys) can be left blank.
-
-## 3. Configure login (OIDC)
-Use the same provider you use locally (Google, Auth0, Okta...). Add this **redirect URI** in the provider:
+## 2. Push to GitHub (including dist/)
+```bash
+git add -A && git commit -m "Update build" && git push
 ```
-https://our-erp-web.onrender.com/auth/callback
-```
-(Add the site's origin under "Authorized JavaScript origins" too, for Google.)
-Then set:
-- API: `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`
-- Web: `VITE_OIDC_AUTHORITY`, `VITE_OIDC_CLIENT_ID` (+ `VITE_OIDC_CLIENT_SECRET` for Google)
+`dist/` is not ignored on purpose. `.env*` files are, so secrets stay out of git
+(except the OIDC values baked into the public JS, which are visible to every visitor anyway).
 
-`VITE_*` values are baked in at build time — after changing one, **Manual Deploy → Deploy latest commit** on `our-erp-web`.
+## 3. Render
+New -> Blueprint -> pick the repo. It creates the Postgres DB and the `our-erp-api`
+service (runs `pnpm db:push --force` on every start, then the server, which also serves `dist/`).
+Set `OIDC_AUTHORITY` and `OIDC_CLIENT_ID` (and optionally SMTP / AI keys).
+If Render gives your service a different URL (name taken), update `VITE_API_URL` and `APP_URL`, rebuild, push.
 
-If Render gave your services different URLs (name taken), update `VITE_API_URL` (web), `APP_URL` (api) and the redirect URI to match.
+## 4. Login provider
+Add `https://our-erp-api.onrender.com/auth/callback` as a redirect URI (Google: also add the origin
+under "Authorized JavaScript origins").
 
-## 4. First login = admin
-The first person to sign in becomes **admin**; everyone after needs an invite (Settings → Users). **Sign in yourself first** before sharing the link.
+## 5. First login = admin
+The first person to sign in becomes **admin**; everyone after needs an invite (Settings -> Users).
+Sign in yourself before sharing the link.
 
 ## Notes
-- Free web services sleep after ~15 min idle (first request takes ~30–60 s); voice chat sessions are in memory and reset on restart. Free Postgres is deleted after 30 days — upgrade the plan to keep data.
-- Google requires a client secret, and `VITE_OIDC_CLIENT_SECRET` is visible to anyone who opens the site's JS. Fine for a test group; for real use switch to Auth0/Okta/Keycloak with a public (PKCE) client, which needs no secret.
-- `db:push` is used for easy setup. For a long-lived production DB, commit migrations (`pnpm db:generate`) and switch the pre-deploy command to `pnpm db:migrate`.
+- Free web services sleep after ~15 min idle (about a minute to wake); an uptime pinger on `/health` keeps it awake. Free Postgres on Render expires after 30 days; Neon/Supabase free Postgres is an alternative.
+- Google needs a client secret, visible in the site's JS. Fine for a test group; for real use pick Auth0/Okta/Keycloak with a public (PKCE) client.
+- `db:push` is for easy setup. For a long-lived DB, commit migrations (`pnpm db:generate`) and use `pnpm db:migrate` instead.
 - Never set `DEV_AUTH_BYPASS=true` on a public deployment.
