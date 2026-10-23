@@ -5,6 +5,13 @@
 /.pnp
 .pnp.js
 
+node_modules
+.env
+.env.local
+.env.*.local
+*.log
+# NOTE: dist/ is intentionally committed (Render serves it; see DEPLOY.md)
+
 pnpm-lock.yaml
 
 # testing
