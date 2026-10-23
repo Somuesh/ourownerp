@@ -1,0 +1,57 @@
+# Builds the React app on GitHub's runners (Render's free plan is too small for
+# `vite build`) and commits the result to dist/, which the server serves.
+name: Build frontend
+
+on:
+  push:
+    branches: [render-ready, main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - "components.json"
+      - ".github/workflows/build-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-frontend
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        run: |
+          rm -rf dist
+          pnpm exec vite build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_OIDC_AUTHORITY: ${{ vars.VITE_OIDC_AUTHORITY }}
+          VITE_OIDC_CLIENT_ID: ${{ vars.VITE_OIDC_CLIENT_ID }}
+          VITE_OIDC_CLIENT_SECRET: ${{ secrets.VITE_OIDC_CLIENT_SECRET }}
+      - name: Commit dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f dist
+          if git diff --cached --quiet; then
+            echo "No changes in dist"
+          else
+            git commit -m "Build frontend"
+            git push
+          fi
