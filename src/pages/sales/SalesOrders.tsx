@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WarehousePickerDialog from "@/components/warehouse-picker-dialog.tsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -11,7 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useApiClient, ApiError } from "@/lib/api-client.ts";
-import type { SalesOrderStatus, SalesOrderLineItem, SalesOrderWithParty } from "@/lib/types.ts";
+import type { SalesOrderStatus, SalesOrderLineItem, SalesOrderWithParty, Warehouse } from "@/lib/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -111,9 +112,31 @@ export default function SalesOrders() {
     onSuccess: invalidate,
   });
   const deliverOrder = useMutation({
-    mutationFn: (id: string) => api.post(`/sales-orders/${id}/deliver`),
+    mutationFn: ({ id, warehouseId }: { id: string; warehouseId?: string }) =>
+      api.post(`/sales-orders/${id}/deliver`, { warehouseId }),
     onSuccess: invalidate,
   });
+  const { data: warehouseList } = useQuery<Warehouse[]>({
+    queryKey: ["warehouses"],
+    queryFn: () => api.get("/warehouses"),
+  });
+  const activeWarehouses = (warehouseList ?? []).filter((w) => w.isActive);
+  const [pickingOrderId, setPickingOrderId] = useState<string | null>(null);
+  const requestFulfil = async (id: string) => {
+    if (activeWarehouses.length > 1) {
+      setPickingOrderId(id);
+      return;
+    }
+    await fulfil(id);
+  };
+  const fulfil = async (id: string, warehouseId?: string) => {
+    try {
+      await deliverOrder.mutateAsync({ id, warehouseId });
+      toast.success("Marked as delivered");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Something went wrong");
+    }
+  };
   const invoiceOrder = useMutation({
     mutationFn: (id: string) => api.post(`/sales-orders/${id}/invoice`),
     onSuccess: () => {
@@ -191,7 +214,7 @@ export default function SalesOrders() {
       return;
     }
     if (targetStatus === "confirmed") runAction(confirmOrder, orderId, "Order confirmed");
-    else if (targetStatus === "delivered") runAction(deliverOrder, orderId, "Marked as delivered");
+    else if (targetStatus === "delivered") requestFulfil(orderId);
     else if (targetStatus === "invoiced") runAction(invoiceOrder, orderId, "Invoice created");
     else if (targetStatus === "cancelled") runAction(cancelOrder, orderId, "Order cancelled");
   };
@@ -214,7 +237,7 @@ export default function SalesOrders() {
           </DropdownMenuItem>
         )}
         {order.status === "confirmed" && (
-          <DropdownMenuItem onClick={() => runAction(deliverOrder, order._id, "Marked as delivered")}>
+          <DropdownMenuItem onClick={() => requestFulfil(order._id)}>
             <Package className="size-3.5" />
             Mark delivered
           </DropdownMenuItem>
@@ -437,6 +460,19 @@ export default function SalesOrders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <WarehousePickerDialog
+        open={pickingOrderId !== null}
+        title="Deliver order"
+        description="Choose the warehouse this order is delivered from."
+        confirmLabel="Deliver"
+        warehouses={activeWarehouses}
+        onClose={() => setPickingOrderId(null)}
+        onConfirm={(warehouseId) => {
+          const id = pickingOrderId;
+          setPickingOrderId(null);
+          if (id) void fulfil(id, warehouseId);
+        }}
+      />
     </div>
   );
 }

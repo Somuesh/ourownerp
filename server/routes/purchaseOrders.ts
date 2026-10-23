@@ -14,6 +14,7 @@ import {
   vendorBills,
 } from "../db/schema.ts";
 import { nextSequenceNumber } from "../db/sequences.ts";
+import { applyStockChange, resolveWarehouse } from "../db/stock.ts";
 import { CAPABILITIES, requireCapability } from "../permissions.ts";
 
 const router = Router();
@@ -325,6 +326,7 @@ router.post(
         throw new AppError(409, `Cannot receive an order in status "${order.status}"`);
       }
 
+      const wh = await resolveWarehouse(tx, (req.body as { warehouseId?: string } | undefined)?.warehouseId);
       const lineItems = await tx
         .select()
         .from(purchaseOrderLineItems)
@@ -335,14 +337,11 @@ router.post(
         const product = await tx.query.products.findFirst({ where: eq(products.id, item.productId) });
         if (!product) continue; // product was deleted since the order was placed
         const quantityChange = Math.round(Number(item.quantity));
-        await tx
-          .update(products)
-          .set({ stockQuantity: product.stockQuantity + quantityChange })
-          .where(eq(products.id, product.id));
+        await applyStockChange(tx, product, wh, quantityChange);
         await tx.insert(stockAdjustments).values({
           productId: product.id,
           quantityChange,
-          reason: `Purchase order ${order.orderNumber} received`,
+          reason: `Purchase order ${order.orderNumber} received into ${wh.name}`,
           createdBy: user._id,
         });
       }

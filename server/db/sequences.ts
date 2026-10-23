@@ -8,6 +8,10 @@ const PREFIXES: Record<string, string> = {
   purchase_order: "PO",
   vendor_bill: "BILL",
   stock_transfer: "TRF",
+  employee: "EMP",
+  leave_request: "LV",
+  pos_session: "SES",
+  pos_order: "POS",
 };
 
 /**

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WarehousePickerDialog from "@/components/warehouse-picker-dialog.tsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -14,8 +15,7 @@ import { useApiClient, ApiError } from "@/lib/api-client.ts";
 import type {
   PurchaseOrderLineItem,
   PurchaseOrderStatus,
-  PurchaseOrderWithVendor,
-} from "@/lib/types.ts";
+  PurchaseOrderWithVendor, Warehouse } from "@/lib/types.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -113,9 +113,31 @@ export default function PurchaseOrders() {
     onSuccess: invalidate,
   });
   const receiveOrder = useMutation({
-    mutationFn: (id: string) => api.post(`/purchase-orders/${id}/receive`),
+    mutationFn: ({ id, warehouseId }: { id: string; warehouseId?: string }) =>
+      api.post(`/purchase-orders/${id}/receive`, { warehouseId }),
     onSuccess: invalidate,
   });
+  const { data: warehouseList } = useQuery<Warehouse[]>({
+    queryKey: ["warehouses"],
+    queryFn: () => api.get("/warehouses"),
+  });
+  const activeWarehouses = (warehouseList ?? []).filter((w) => w.isActive);
+  const [pickingOrderId, setPickingOrderId] = useState<string | null>(null);
+  const requestFulfil = async (id: string) => {
+    if (activeWarehouses.length > 1) {
+      setPickingOrderId(id);
+      return;
+    }
+    await fulfil(id);
+  };
+  const fulfil = async (id: string, warehouseId?: string) => {
+    try {
+      await receiveOrder.mutateAsync({ id, warehouseId });
+      toast.success("Marked as received");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Something went wrong");
+    }
+  };
   const billOrder = useMutation({
     mutationFn: (id: string) => api.post(`/purchase-orders/${id}/bill`),
     onSuccess: () => {
@@ -193,7 +215,7 @@ export default function PurchaseOrders() {
       return;
     }
     if (targetStatus === "confirmed") runAction(confirmOrder, orderId, "Order confirmed");
-    else if (targetStatus === "received") runAction(receiveOrder, orderId, "Marked as received");
+    else if (targetStatus === "received") requestFulfil(orderId);
     else if (targetStatus === "billed") runAction(billOrder, orderId, "Vendor bill created");
     else if (targetStatus === "cancelled") runAction(cancelOrder, orderId, "Order cancelled");
   };
@@ -216,7 +238,7 @@ export default function PurchaseOrders() {
           </DropdownMenuItem>
         )}
         {order.status === "confirmed" && (
-          <DropdownMenuItem onClick={() => runAction(receiveOrder, order._id, "Marked as received")}>
+          <DropdownMenuItem onClick={() => requestFulfil(order._id)}>
             <Package className="size-3.5" />
             Mark received
           </DropdownMenuItem>
@@ -428,6 +450,19 @@ export default function PurchaseOrders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <WarehousePickerDialog
+        open={pickingOrderId !== null}
+        title="Receive order"
+        description="Choose the warehouse this order is received into."
+        confirmLabel="Receive"
+        warehouses={activeWarehouses}
+        onClose={() => setPickingOrderId(null)}
+        onConfirm={(warehouseId) => {
+          const id = pickingOrderId;
+          setPickingOrderId(null);
+          if (id) void fulfil(id, warehouseId);
+        }}
+      />
     </div>
   );
 }

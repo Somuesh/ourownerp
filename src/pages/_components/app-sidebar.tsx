@@ -11,6 +11,8 @@ import {
   Building2,
   UserCircle,
   Warehouse,
+  Briefcase,
+  Store,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +37,8 @@ const NAV_ITEMS = [
   { to: "/crm", label: "CRM", icon: Users2, roles: ["admin", "staff"] as const },
   { to: "/inventory", label: "Inventory", icon: Boxes, roles: ["admin", "staff"] as const },
   { to: "/inventory/warehouses", label: "Warehouses", icon: Warehouse, roles: ["admin", "staff"] as const },
+  { to: "/pos", label: "POS", icon: Store, roles: ["admin", "staff"] as const },
+  { to: "/hr", label: "HR", icon: Briefcase, roles: ["admin", "staff"] as const },
   { to: "/sales", label: "Sales", icon: Receipt, roles: ["admin", "staff"] as const },
   { to: "/purchasing", label: "Purchasing", icon: ShoppingCart, roles: ["admin", "staff"] as const },
   { to: "/invoices", label: "Invoices", icon: FileText, roles: ["admin", "staff"] as const },

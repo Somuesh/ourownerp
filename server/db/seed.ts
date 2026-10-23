@@ -1,5 +1,5 @@
 import { db } from "./client.ts";
-import { dealStages, rolePermissions, warehouses } from "./schema.ts";
+import { dealStages, leaveTypes, rolePermissions, warehouses } from "./schema.ts";
 import { DEFAULT_GRANTS } from "../permissions.ts";
 
 /** Populates `role_permissions` with the default grants the first time the
@@ -48,4 +48,14 @@ export async function seedWarehouses(): Promise<void> {
   const existing = await db.select({ id: warehouses.id }).from(warehouses).limit(1);
   if (existing.length > 0) return;
   await db.insert(warehouses).values({ name: "Main Warehouse", code: "MAIN", isDefault: true });
+}
+
+export async function seedLeaveTypes(): Promise<void> {
+  const existing = await db.select({ id: leaveTypes.id }).from(leaveTypes).limit(1);
+  if (existing.length > 0) return;
+  await db.insert(leaveTypes).values([
+    { name: "Annual leave", daysPerYear: 18 },
+    { name: "Sick leave", daysPerYear: 12 },
+    { name: "Unpaid leave", daysPerYear: 0 },
+  ]);
 }

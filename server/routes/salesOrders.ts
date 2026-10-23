@@ -14,6 +14,7 @@ import {
   stockAdjustments,
 } from "../db/schema.ts";
 import { nextSequenceNumber } from "../db/sequences.ts";
+import { applyStockChange, resolveWarehouse } from "../db/stock.ts";
 import { CAPABILITIES, requireCapability } from "../permissions.ts";
 
 const router = Router();
@@ -295,6 +296,7 @@ router.post(
         throw new AppError(409, `Cannot deliver an order in status "${order.status}"`);
       }
 
+      const wh = await resolveWarehouse(tx, (req.body as { warehouseId?: string } | undefined)?.warehouseId);
       const lineItems = await tx
         .select()
         .from(salesOrderLineItems)
@@ -305,18 +307,11 @@ router.post(
         const product = await tx.query.products.findFirst({ where: eq(products.id, item.productId) });
         if (!product) continue; // product was deleted since the order was placed
         const quantityChange = -Math.round(Number(item.quantity));
-        const newQuantity = product.stockQuantity + quantityChange;
-        if (newQuantity < 0) {
-          throw new AppError(
-            400,
-            `Not enough stock for "${product.name}" (have ${product.stockQuantity}, need ${Math.abs(quantityChange)})`,
-          );
-        }
-        await tx.update(products).set({ stockQuantity: newQuantity }).where(eq(products.id, product.id));
+        await applyStockChange(tx, product, wh, quantityChange);
         await tx.insert(stockAdjustments).values({
           productId: product.id,
           quantityChange,
-          reason: `Sales order ${order.orderNumber} delivered`,
+          reason: `Sales order ${order.orderNumber} delivered from ${wh.name}`,
           createdBy: user._id,
         });
       }

@@ -3,14 +3,16 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { AppError } from "./auth.ts";
-import { seedDealStages, seedPermissions, seedWarehouses } from "./db/seed.ts";
+import { seedDealStages, seedLeaveTypes, seedPermissions, seedWarehouses } from "./db/seed.ts";
 import activitiesRouter from "./routes/activities.ts";
 import companiesRouter from "./routes/companies.ts";
 import contactsRouter from "./routes/contacts.ts";
 import dashboardRouter from "./routes/dashboard.ts";
 import dealsRouter from "./routes/deals.ts";
 import dealStagesRouter from "./routes/dealStages.ts";
+import hrRouter from "./routes/hr.ts";
 import invoicesRouter from "./routes/invoices.ts";
+import posRouter from "./routes/pos.ts";
 import portalRouter from "./routes/portal.ts";
 import productsRouter from "./routes/products.ts";
 import purchaseOrdersRouter from "./routes/purchaseOrders.ts";
@@ -39,6 +41,8 @@ app.use(activitiesRouter);
 app.use(productsRouter);
 app.use(stockAdjustmentsRouter);
 app.use(warehousesRouter);
+app.use(hrRouter);
+app.use(posRouter);
 app.use(invoicesRouter);
 app.use(salesOrdersRouter);
 app.use(purchaseOrdersRouter);
@@ -64,6 +68,7 @@ async function main() {
   await seedPermissions();
   await seedDealStages();
   await seedWarehouses();
+  await seedLeaveTypes();
 
   const port = Number(process.env.PORT ?? 3001);
   app.listen(port, () => {

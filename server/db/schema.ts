@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  date,
   integer,
   jsonb,
   numeric,
@@ -16,6 +17,12 @@ import {
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
+
+export const employeeStatusEnum = pgEnum("employee_status", ["active", "on_leave", "terminated"]);
+export const leaveStatusEnum = pgEnum("leave_status", ["pending", "approved", "rejected", "cancelled"]);
+
+export const posSessionStatusEnum = pgEnum("pos_session_status", ["open", "closed"]);
+export const posPaymentMethodEnum = pgEnum("pos_payment_method", ["cash", "card", "upi"]);
 
 export const roleEnum = pgEnum("role", ["admin", "staff", "client"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", [
@@ -207,6 +214,125 @@ export const stockTransfers = pgTable("stock_transfers", {
     .notNull()
     .references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// HR (Phase 5)
+// ---------------------------------------------------------------------------
+
+export const departments = pgTable("departments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const employees = pgTable("employees", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeeNumber: text("employee_number").notNull().unique(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  jobTitle: text("job_title"),
+  departmentId: uuid("department_id").references(() => departments.id, { onDelete: "set null" }),
+  // Self-reference kept as a plain uuid (no FK) to keep drizzle typing simple.
+  managerId: uuid("manager_id"),
+  // Optional link to a login so staff can self-serve leave and attendance.
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  status: employeeStatusEnum("status").notNull().default("active"),
+  hireDate: date("hire_date", { mode: "string" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const leaveTypes = pgTable("leave_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  daysPerYear: integer("days_per_year").notNull().default(0),
+});
+
+export const leaveRequests = pgTable("leave_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  requestNumber: text("request_number").notNull().unique(),
+  employeeId: uuid("employee_id")
+    .notNull()
+    .references(() => employees.id, { onDelete: "cascade" }),
+  leaveTypeId: uuid("leave_type_id")
+    .notNull()
+    .references(() => leaveTypes.id),
+  startDate: date("start_date", { mode: "string" }).notNull(),
+  endDate: date("end_date", { mode: "string" }).notNull(),
+  days: integer("days").notNull(),
+  reason: text("reason"),
+  status: leaveStatusEnum("status").notNull().default("pending"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendance = pgTable("attendance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeeId: uuid("employee_id")
+    .notNull()
+    .references(() => employees.id, { onDelete: "cascade" }),
+  checkIn: timestamp("check_in", { withTimezone: true }).notNull().defaultNow(),
+  checkOut: timestamp("check_out", { withTimezone: true }),
+});
+
+// ---------------------------------------------------------------------------
+// Point of Sale (Phase 6)
+// ---------------------------------------------------------------------------
+
+export const posSessions = pgTable("pos_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionNumber: text("session_number").notNull().unique(),
+  status: posSessionStatusEnum("status").notNull().default("open"),
+  warehouseId: uuid("warehouse_id")
+    .notNull()
+    .references(() => warehouses.id),
+  openedBy: uuid("opened_by")
+    .notNull()
+    .references(() => users.id),
+  openingCash: numeric("opening_cash", { precision: 14, scale: 2 }).notNull(),
+  closingCash: numeric("closing_cash", { precision: 14, scale: 2 }),
+  expectedCash: numeric("expected_cash", { precision: 14, scale: 2 }),
+  openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+});
+
+export const posOrders = pgTable("pos_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderNumber: text("order_number").notNull().unique(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => posSessions.id),
+  contactId: uuid("contact_id").references(() => contacts.id),
+  paymentMethod: posPaymentMethodEnum("payment_method").notNull(),
+  taxRate: numeric("tax_rate", { precision: 6, scale: 3 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  taxAmount: numeric("tax_amount", { precision: 14, scale: 2 }).notNull(),
+  total: numeric("total", { precision: 14, scale: 2 }).notNull(),
+  amountTendered: numeric("amount_tendered", { precision: 14, scale: 2 }).notNull(),
+  changeGiven: numeric("change_given", { precision: 14, scale: 2 }).notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const posOrderLines = pgTable("pos_order_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  posOrderId: uuid("pos_order_id")
+    .notNull()
+    .references(() => posOrders.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+  lineTotal: numeric("line_total", { precision: 14, scale: 2 }).notNull(),
 });
 
 // ---------------------------------------------------------------------------

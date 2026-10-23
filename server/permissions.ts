@@ -26,6 +26,10 @@ export const CAPABILITIES = {
   SALES_WRITE: "sales:write",
   PURCHASING_READ: "purchasing:read",
   PURCHASING_WRITE: "purchasing:write",
+  HR_READ: "hr:read",
+  HR_WRITE: "hr:write",
+  POS_USE: "pos:use",
+  POS_MANAGE: "pos:manage",
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
@@ -48,6 +52,9 @@ export const DEFAULT_GRANTS: Record<Role, Capability[]> = {
     CAPABILITIES.SALES_WRITE,
     CAPABILITIES.PURCHASING_READ,
     CAPABILITIES.PURCHASING_WRITE,
+    // Staff can see the directory and self-serve leave/attendance; managing HR is admin-only.
+    CAPABILITIES.HR_READ,
+    CAPABILITIES.POS_USE,
   ],
   client: [],
 };

@@ -343,3 +343,66 @@ export interface ReorderItem {
   lowStockThreshold: number;
   suggestedReorderQuantity: number;
 }
+
+export interface Department {
+  _id: string;
+  name: string;
+}
+
+export interface Employee {
+  _id: string;
+  employeeNumber: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  jobTitle?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  managerId?: string | null;
+  managerName?: string | null;
+  userId?: string | null;
+  status: "active" | "on_leave" | "terminated";
+  hireDate?: string | null;
+}
+
+export interface LeaveType {
+  _id: string;
+  name: string;
+  daysPerYear: number;
+}
+
+export interface LeaveRequest {
+  _id: string;
+  requestNumber: string;
+  employeeId: string;
+  employeeName: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason?: string | null;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+}
+
+export interface AttendanceRow {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  checkInIso: string;
+  checkOutIso: string | null;
+}
+
+export interface PosSession {
+  _id: string;
+  sessionNumber: string;
+  status: "open" | "closed";
+  warehouseId: string;
+  openedByName?: string | null;
+  openingCash: number;
+  closingCash?: number | null;
+  expectedCash?: number | null;
+  openedAtIso: string;
+  closedAtIso?: string | null;
+  totals: { orderCount: number; total: number; byMethod: { cash: number; card: number; upi: number } };
+}

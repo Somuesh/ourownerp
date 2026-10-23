@@ -229,6 +229,157 @@ export const VOICE_TOOLS: ToolDefinition[] = [
     parameters: { type: "object", properties: {} },
   },
 
+  // ---- HR -------------------------------------------------------------------
+  {
+    name: "search_employees",
+    description: "Search employees by (partial) name. Use this before referencing an employee in another tool.",
+    parameters: {
+      type: "object",
+      properties: { query: { type: "string", description: "Partial or full employee name." } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "list_departments",
+    description: "List all departments with their IDs.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "create_department",
+    description: "Create a department. Check list_departments first to avoid duplicates.",
+    parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+  },
+  {
+    name: "create_employee",
+    description: "Add a new employee. Search with search_employees first to avoid duplicates.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        jobTitle: { type: "string" },
+        departmentId: { type: "string", description: "Look up with list_departments." },
+        managerId: { type: "string", description: "Employee ID of the manager, from search_employees." },
+        hireDate: { type: "string", description: "YYYY-MM-DD" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "list_leave_types",
+    description: "List leave types (annual, sick, ...) with their IDs and yearly allowance.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "request_leave",
+    description: "Create a leave request for an employee (omit employeeId for the current user's own leave). Weekends are not counted.",
+    parameters: {
+      type: "object",
+      properties: {
+        employeeId: { type: "string" },
+        leaveTypeId: { type: "string", description: "From list_leave_types." },
+        startDate: { type: "string", description: "YYYY-MM-DD" },
+        endDate: { type: "string", description: "YYYY-MM-DD (same as start for one day)" },
+        reason: { type: "string" },
+      },
+      required: ["leaveTypeId", "startDate", "endDate"],
+    },
+  },
+  {
+    name: "list_leave_requests",
+    description: "List leave requests, optionally only those with a given status.",
+    parameters: {
+      type: "object",
+      properties: { status: { type: "string", enum: ["pending", "approved", "rejected", "cancelled"] } },
+    },
+  },
+  {
+    name: "approve_leave",
+    description: "Approve a pending leave request (admin only).",
+    parameters: { type: "object", properties: { leaveRequestId: { type: "string" } }, required: ["leaveRequestId"] },
+  },
+  {
+    name: "reject_leave",
+    description: "Reject a pending leave request (admin only).",
+    parameters: { type: "object", properties: { leaveRequestId: { type: "string" } }, required: ["leaveRequestId"] },
+  },
+  {
+    name: "get_leave_balance",
+    description: "Show an employee's leave balance (allowed, used, remaining) for this year.",
+    parameters: { type: "object", properties: { employeeId: { type: "string" } }, required: ["employeeId"] },
+  },
+  {
+    name: "who_is_on_leave",
+    description: "List employees on approved leave on a given day (default today).",
+    parameters: { type: "object", properties: { date: { type: "string", description: "YYYY-MM-DD, optional." } } },
+  },
+  {
+    name: "check_in",
+    description: "Record attendance check-in for the current user (or the given employee if admin).",
+    parameters: { type: "object", properties: { employeeId: { type: "string" } } },
+  },
+  {
+    name: "check_out",
+    description: "Record attendance check-out for the current user (or the given employee if admin).",
+    parameters: { type: "object", properties: { employeeId: { type: "string" } } },
+  },
+
+  // ---- POS ------------------------------------------------------------------
+  {
+    name: "get_pos_session",
+    description: "Get the current user's open POS session with sales totals so far, or null if none is open.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "open_pos_session",
+    description: "Open a POS register session with the starting cash in the drawer.",
+    parameters: {
+      type: "object",
+      properties: {
+        openingCash: { type: "number", description: "Cash in the drawer at start. Ask if not stated." },
+        warehouseId: { type: "string", description: "Optional; defaults to the main warehouse." },
+      },
+      required: ["openingCash"],
+    },
+  },
+  {
+    name: "create_pos_sale",
+    description: "Ring up a point-of-sale sale in the open session. Prices come from the product catalog. Reduces stock.",
+    parameters: {
+      type: "object",
+      properties: {
+        lines: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              productId: { type: "string", description: "Look up with search_products first." },
+              quantity: { type: "number" },
+            },
+            required: ["productId", "quantity"],
+          },
+        },
+        paymentMethod: { type: "string", enum: ["cash", "card", "upi"] },
+        amountTendered: { type: "number", description: "Cash handed over (cash payments only)." },
+        taxRate: { type: "number", description: "Tax percent, e.g. 18. Default 0." },
+      },
+      required: ["lines", "paymentMethod"],
+    },
+  },
+  {
+    name: "close_pos_session",
+    description: "Close the open POS session given the counted cash in the drawer. Reports expected cash and any difference.",
+    parameters: {
+      type: "object",
+      properties: {
+        sessionId: { type: "string", description: "From get_pos_session." },
+        closingCash: { type: "number", description: "Counted cash in the drawer." },
+      },
+      required: ["sessionId", "closingCash"],
+    },
+  },
+
   // ---- Sales ------------------------------------------------------------
   {
     name: "create_sales_order",
@@ -258,10 +409,13 @@ export const VOICE_TOOLS: ToolDefinition[] = [
   },
   {
     name: "deliver_sales_order",
-    description: "Mark a confirmed sales order as delivered. Decrements product stock for each line item.",
+    description: "Mark a confirmed sales order as delivered. Decrements product stock for each line item from the chosen warehouse (default warehouse if none given).",
     parameters: {
       type: "object",
-      properties: { salesOrderId: { type: "string" } },
+      properties: {
+        salesOrderId: { type: "string" },
+        warehouseId: { type: "string", description: "Optional. Look up with list_warehouses; ask the user if several warehouses exist and they did not say." },
+      },
       required: ["salesOrderId"],
     },
   },
@@ -347,10 +501,13 @@ export const VOICE_TOOLS: ToolDefinition[] = [
   },
   {
     name: "receive_purchase_order",
-    description: "Mark a confirmed purchase order as received. Increments product stock for each line item.",
+    description: "Mark a confirmed purchase order as received. Increments product stock for each line item in the chosen warehouse (default warehouse if none given).",
     parameters: {
       type: "object",
-      properties: { purchaseOrderId: { type: "string" } },
+      properties: {
+        purchaseOrderId: { type: "string" },
+        warehouseId: { type: "string", description: "Optional. Look up with list_warehouses; ask the user if several warehouses exist and they did not say." },
+      },
       required: ["purchaseOrderId"],
     },
   },

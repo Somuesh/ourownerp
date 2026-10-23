@@ -176,6 +176,64 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   },
   get_reorder_report: async (_input, ctx) => callApi("GET", "/inventory/reorder", ctx.authHeader),
 
+  // ---- HR -----------------------------------------------------------------
+  search_employees: async (input, ctx) => {
+    const all = await callApi("GET", "/employees", ctx.authHeader);
+    return pick(
+      all.filter((e: any) => matches(e.name, input.query)),
+      ["_id", "name", "employeeNumber", "jobTitle", "departmentName", "status"],
+    );
+  },
+  list_departments: async (_input, ctx) => callApi("GET", "/departments", ctx.authHeader),
+  create_department: async (input, ctx) => {
+    const result = await callApi("POST", "/departments", ctx.authHeader, input);
+    ctx.setResultPath("/hr");
+    return result;
+  },
+  create_employee: async (input, ctx) => {
+    const result = await callApi("POST", "/employees", ctx.authHeader, input);
+    ctx.setResultPath("/hr");
+    return result;
+  },
+  list_leave_types: async (_input, ctx) => callApi("GET", "/leave-types", ctx.authHeader),
+  request_leave: async (input, ctx) => {
+    const result = await callApi("POST", "/leave-requests", ctx.authHeader, input);
+    ctx.setResultPath("/hr");
+    return result;
+  },
+  list_leave_requests: async (input, ctx) => {
+    const q = input.status ? `?status=${encodeURIComponent(input.status)}` : "";
+    const all = await callApi("GET", `/leave-requests${q}`, ctx.authHeader);
+    return pick(all.slice(0, 25), ["_id", "requestNumber", "employeeName", "leaveTypeName", "startDate", "endDate", "days", "status"]);
+  },
+  approve_leave: async (input, ctx) =>
+    callApi("POST", `/leave-requests/${input.leaveRequestId}/approve`, ctx.authHeader),
+  reject_leave: async (input, ctx) =>
+    callApi("POST", `/leave-requests/${input.leaveRequestId}/reject`, ctx.authHeader),
+  get_leave_balance: async (input, ctx) =>
+    callApi("GET", `/employees/${input.employeeId}/leave-balance`, ctx.authHeader),
+  who_is_on_leave: async (input, ctx) => {
+    const q = input.date ? `?date=${encodeURIComponent(input.date)}` : "";
+    return callApi("GET", `/leaves/on${q}`, ctx.authHeader);
+  },
+  check_in: async (input, ctx) => callApi("POST", "/attendance/check-in", ctx.authHeader, input),
+  check_out: async (input, ctx) => callApi("POST", "/attendance/check-out", ctx.authHeader, input),
+
+  // ---- POS ----------------------------------------------------------------
+  get_pos_session: async (_input, ctx) => callApi("GET", "/pos/session", ctx.authHeader),
+  open_pos_session: async (input, ctx) => {
+    const result = await callApi("POST", "/pos/sessions/open", ctx.authHeader, input);
+    ctx.setResultPath("/pos");
+    return result;
+  },
+  create_pos_sale: async (input, ctx) => {
+    const result = await callApi("POST", "/pos/orders", ctx.authHeader, input);
+    ctx.setResultPath("/pos");
+    return result;
+  },
+  close_pos_session: async (input, ctx) =>
+    callApi("POST", `/pos/sessions/${input.sessionId}/close`, ctx.authHeader, { closingCash: input.closingCash }),
+
   // ---- Sales --------------------------------------------------------------
   create_sales_order: async (input, ctx) => {
     const result = await callApi("POST", "/sales-orders", ctx.authHeader, input);
@@ -185,7 +243,9 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   confirm_sales_order: async (input, ctx) =>
     callApi("POST", `/sales-orders/${input.salesOrderId}/confirm`, ctx.authHeader),
   deliver_sales_order: async (input, ctx) =>
-    callApi("POST", `/sales-orders/${input.salesOrderId}/deliver`, ctx.authHeader),
+    callApi("POST", `/sales-orders/${input.salesOrderId}/deliver`, ctx.authHeader, {
+      warehouseId: input.warehouseId,
+    }),
   invoice_sales_order: async (input, ctx) => {
     const result = await callApi("POST", `/sales-orders/${input.salesOrderId}/invoice`, ctx.authHeader, {
       dueDateIso: input.dueDateIso,
@@ -214,7 +274,9 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   confirm_purchase_order: async (input, ctx) =>
     callApi("POST", `/purchase-orders/${input.purchaseOrderId}/confirm`, ctx.authHeader),
   receive_purchase_order: async (input, ctx) =>
-    callApi("POST", `/purchase-orders/${input.purchaseOrderId}/receive`, ctx.authHeader),
+    callApi("POST", `/purchase-orders/${input.purchaseOrderId}/receive`, ctx.authHeader, {
+      warehouseId: input.warehouseId,
+    }),
   bill_purchase_order: async (input, ctx) => {
     const result = await callApi(
       "POST",

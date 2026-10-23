@@ -9,6 +9,8 @@ import Companies from "./pages/crm/Companies.tsx";
 import Deals from "./pages/crm/Deals.tsx";
 import ContactDetail from "./pages/crm/ContactDetails.tsx";
 import Inventory from "./pages/inventory/Inventory.tsx";
+import Pos from "./pages/pos/Pos.tsx";
+import Hr from "./pages/hr/Hr.tsx";
 import Warehouses from "./pages/inventory/Warehouses.tsx";
 import Invoices from "./pages/invoices/Invoices.tsx";
 import SalesOrders from "./pages/sales/SalesOrders.tsx";
@@ -38,6 +40,8 @@ export default function App() {
             </Route>
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/inventory/warehouses" element={<Warehouses />} />
+            <Route path="/pos" element={<Pos />} />
+            <Route path="/hr" element={<Hr />} />
             <Route path="/sales" element={<SalesOrders />} />
             <Route element={<PurchasingLayout />}>
               <Route path="/purchasing" element={<PurchaseOrders />} />
