@@ -1,5 +1,7 @@
 // Must be the very first import — everything below reads process.env.
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import cors from "cors";
 import express from "express";
 import { AppError } from "./auth.ts";
@@ -50,6 +52,18 @@ app.use(vendorBillsRouter);
 app.use(portalRouter);
 app.use(dashboardRouter);
 app.use(voiceRouter);
+
+// Production: serve the built frontend (dist/) from this same server, with SPA
+// fallback so deep links like /auth/callback work. Skipped when dist/ is absent
+// (local dev uses the Vite dev server instead).
+const distDir = path.resolve(process.cwd(), "dist");
+if (fs.existsSync(path.join(distDir, "index.html"))) {
+  app.use(express.static(distDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || !req.accepts("html")) return next();
+    res.sendFile(path.join(distDir, "index.html"));
+  });
+}
 
 app.use(
   (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
