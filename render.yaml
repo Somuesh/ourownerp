@@ -1,7 +1,8 @@
-# Render Blueprint for Our ERP: Postgres + API (Express) + web (Vite static site).
-# Service names decide the public URLs (https://<name>.onrender.com). If a name is
-# taken Render adds a suffix — then update VITE_API_URL / APP_URL / the OIDC
-# redirect URI below to match, and redeploy the web service.
+# Render Blueprint for Our ERP: Postgres + ONE web service that runs the Express API
+# and also serves the built React app (same origin, so no CORS or separate static site).
+# The service name decides the public URL (https://<name>.onrender.com). If the name
+# is taken Render adds a suffix — then update VITE_API_URL / APP_URL and the OIDC
+# redirect URI to match, and redeploy.
 databases:
   - name: our-erp-db
     plan: free
@@ -13,13 +14,16 @@ services:
     name: our-erp-api
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --prod=false
+    # Installs everything, then builds the frontend into dist/ (VITE_* are read here).
+    buildCommand: corepack enable && pnpm install --prod=false && pnpm exec vite build
     # Free tier has no pre-deploy command, so the schema is applied on every start.
     startCommand: corepack enable && pnpm db:push --force && pnpm start:server
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 22
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=460
       - key: DATABASE_URL
         fromDatabase:
           name: our-erp-db
@@ -27,10 +31,19 @@ services:
       - key: DEV_AUTH_BYPASS
         value: "false"
       - key: APP_URL
-        value: https://our-erp-web.onrender.com
+        value: https://our-erp-api.onrender.com
+      - key: VITE_API_URL
+        value: https://our-erp-api.onrender.com
       - key: OIDC_AUTHORITY
         sync: false
       - key: OIDC_CLIENT_ID
+        sync: false
+      - key: VITE_OIDC_AUTHORITY
+        sync: false
+      - key: VITE_OIDC_CLIENT_ID
+        sync: false
+      # Only needed for Google (see DEPLOY.md note on client secrets).
+      - key: VITE_OIDC_CLIENT_SECRET
         sync: false
       # Optional: email (invites, invoices) and voice AI providers.
       - key: SMTP_HOST
@@ -50,27 +63,4 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: GEMINI_API_KEY
-        sync: false
-
-  - type: web
-    name: our-erp-web
-    runtime: static
-    buildCommand: corepack enable && pnpm install --prod=false && pnpm exec vite build
-    staticPublishPath: dist
-    routes:
-      # Single-page app: send every path to index.html so /auth/callback etc. work.
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: NODE_VERSION
-        value: 22
-      - key: VITE_API_URL
-        value: https://our-erp-api.onrender.com
-      - key: VITE_OIDC_AUTHORITY
-        sync: false
-      - key: VITE_OIDC_CLIENT_ID
-        sync: false
-      # Only needed for Google (see DEPLOY.md note on client secrets).
-      - key: VITE_OIDC_CLIENT_SECRET
         sync: false
